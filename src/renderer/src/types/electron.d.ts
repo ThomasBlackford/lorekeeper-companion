@@ -11,7 +11,7 @@ interface ElectronAPI {
         Pick<
           Character,
           | 'name' | 'race' | 'class' | 'level' | 'alignment'
-          | 'ac' | 'proficiency_bonus' | 'speed'
+          | 'ac' | 'proficiency_bonus' | 'speed' | 'initiative'
           | 'str_score' | 'dex_score' | 'con_score' | 'int_score' | 'wis_score' | 'cha_score'
           | 'hp_current' | 'hp_max'
           | 'spellcasting_ability' | 'gold' | 'notes' | 'dm_server_address'

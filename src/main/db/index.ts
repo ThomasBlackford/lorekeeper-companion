@@ -49,6 +49,7 @@ function createSchema(): void {
       background        TEXT NOT NULL DEFAULT '{}',
       dm_server_address TEXT NOT NULL DEFAULT '',
       client_id         TEXT NOT NULL DEFAULT '',
+      initiative        INTEGER,
       resources         TEXT NOT NULL DEFAULT '[]',
       defenses          TEXT NOT NULL DEFAULT '[]',
       conditions        TEXT NOT NULL DEFAULT '[]'
@@ -241,5 +242,15 @@ function runMigrations(): void {
       d.prepare("UPDATE character SET client_id=? WHERE id='local'").run(uuidv4())
     }
     d.prepare('UPDATE schema_version SET version = 4').run()
+  }
+
+  if (v < 5) {
+    // Initiative is now something the player rolls/enters on their own
+    // sheet — it syncs to the DM's roster instead of the DM typing it in.
+    const charCols = d.prepare('PRAGMA table_info(character)').all() as { name: string }[]
+    if (!charCols.some((c) => c.name === 'initiative')) {
+      d.exec('ALTER TABLE character ADD COLUMN initiative INTEGER')
+    }
+    d.prepare('UPDATE schema_version SET version = 5').run()
   }
 }

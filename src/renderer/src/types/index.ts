@@ -140,6 +140,7 @@ export interface Character {
   ac: number | null
   proficiency_bonus: number | null
   speed: number | null
+  initiative: number | null
   str_score: number
   dex_score: number
   con_score: number

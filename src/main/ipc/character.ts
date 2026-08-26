@@ -15,6 +15,7 @@ interface CharacterRow {
   ac: number | null
   proficiency_bonus: number | null
   speed: number | null
+  initiative: number | null
   str_score: number
   dex_score: number
   con_score: number
@@ -114,6 +115,7 @@ function buildCharacter(db: ReturnType<typeof getDb>) {
     ac: row.ac,
     proficiency_bonus: row.proficiency_bonus,
     speed: row.speed,
+    initiative: row.initiative,
     str_score: row.str_score,
     dex_score: row.dex_score,
     con_score: row.con_score,
@@ -155,6 +157,7 @@ function buildCharacterAndSync(db: ReturnType<typeof getDb>) {
     class: character.class,
     level: character.level,
     ac: character.ac,
+    initiative: character.initiative,
     hp_current: character.hp_current,
     hp_max: character.hp_max,
     spellSlots: character.spellSlots,
@@ -185,6 +188,7 @@ export function registerCharacterHandlers(): void {
     const proficiencyBonus =
       'proficiency_bonus' in changes ? (changes.proficiency_bonus as number | null) : existing.proficiency_bonus
     const speed = 'speed' in changes ? (changes.speed as number | null) : existing.speed
+    const initiative = 'initiative' in changes ? (changes.initiative as number | null) : existing.initiative
     const strScore = 'str_score' in changes ? (changes.str_score as number) : existing.str_score
     const dexScore = 'dex_score' in changes ? (changes.dex_score as number) : existing.dex_score
     const conScore = 'con_score' in changes ? (changes.con_score as number) : existing.con_score
@@ -203,12 +207,12 @@ export function registerCharacterHandlers(): void {
       'dm_server_address' in changes ? (changes.dm_server_address as string) : existing.dm_server_address
 
     db.prepare(
-      `UPDATE character SET name=?, race=?, class=?, level=?, alignment=?, ac=?, proficiency_bonus=?, speed=?,
+      `UPDATE character SET name=?, race=?, class=?, level=?, alignment=?, ac=?, proficiency_bonus=?, speed=?, initiative=?,
        str_score=?, dex_score=?, con_score=?, int_score=?, wis_score=?, cha_score=?, hp_current=?, hp_max=?,
        spellcasting_ability=?, gold=?, notes=?, dm_server_address=?
        WHERE id=?`
     ).run(
-      name, race, charClass, level, alignment, ac, proficiencyBonus, speed,
+      name, race, charClass, level, alignment, ac, proficiencyBonus, speed, initiative,
       strScore, dexScore, conScore, intScore, wisScore, chaScore, hpCurrent, hpMax,
       spellcastingAbility, gold, notes, dmServerAddress,
       CHAR_ID

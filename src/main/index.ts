@@ -2,7 +2,7 @@ import { app, shell, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { initDb, getDb } from './db'
-import { setMainWin } from './mainWindow'
+import { setMainWin, getMainWin } from './mainWindow'
 import { registerCharacterHandlers } from './ipc/character'
 import { registerSyncHandlers } from './ipc/sync'
 import { connect, disconnect } from './sync'
@@ -40,33 +40,50 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(() => {
-  electronApp.setAppUserModelId('com.lorekeeper.companion')
-
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
+// A second launch shares the same local database (same client_id), so it'd
+// silently open a second connection under the same identity and fight the
+// first window for which one the DM actually sees as "live." Redirect it to
+// focus the existing window instead.
+const gotLock = app.requestSingleInstanceLock()
+if (!gotLock) {
+  app.quit()
+} else {
+  app.on('second-instance', () => {
+    const win = getMainWin()
+    if (win) {
+      if (win.isMinimized()) win.restore()
+      win.focus()
+    }
   })
 
-  initDb(app.getPath('userData'))
-  registerCharacterHandlers()
-  registerSyncHandlers()
+  app.whenReady().then(() => {
+    electronApp.setAppUserModelId('com.lorekeeper.companion')
 
-  createWindow()
+    app.on('browser-window-created', (_, window) => {
+      optimizer.watchWindowShortcuts(window)
+    })
 
-  // Reconnect to whatever DM server was last used, if any — harmless if
-  // it's not reachable, just leaves the app in its normal disconnected
-  // state until the player connects manually from Settings.
-  const saved = getDb().prepare("SELECT dm_server_address FROM character WHERE id='local'").get() as
-    | { dm_server_address: string }
-    | undefined
-  if (saved?.dm_server_address) connect(saved.dm_server_address)
+    initDb(app.getPath('userData'))
+    registerCharacterHandlers()
+    registerSyncHandlers()
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    createWindow()
+
+    // Reconnect to whatever DM server was last used, if any — harmless if
+    // it's not reachable, just leaves the app in its normal disconnected
+    // state until the player connects manually from Settings.
+    const saved = getDb().prepare("SELECT dm_server_address FROM character WHERE id='local'").get() as
+      | { dm_server_address: string }
+      | undefined
+    if (saved?.dm_server_address) connect(saved.dm_server_address)
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    })
   })
-})
 
-app.on('window-all-closed', () => {
-  disconnect()
-  if (process.platform !== 'darwin') app.quit()
-})
+  app.on('window-all-closed', () => {
+    disconnect()
+    if (process.platform !== 'darwin') app.quit()
+  })
+}

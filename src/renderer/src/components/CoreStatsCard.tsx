@@ -4,7 +4,7 @@ import { AbilityScores } from './AbilityScores'
 
 interface Props {
   character: Character
-  onVitalsChange: (changes: Partial<Pick<Character, 'ac' | 'proficiency_bonus' | 'speed'>>) => void
+  onVitalsChange: (changes: Partial<Pick<Character, 'ac' | 'proficiency_bonus' | 'speed' | 'initiative'>>) => void
   onScoreChange: (key: AbilityScoreKey, value: number) => void
 }
 

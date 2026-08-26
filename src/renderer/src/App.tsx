@@ -32,7 +32,7 @@ export function App() {
   }
 
   async function handleVitalsChange(
-    changes: Partial<Pick<Character, 'ac' | 'proficiency_bonus' | 'speed'>>
+    changes: Partial<Pick<Character, 'ac' | 'proficiency_bonus' | 'speed' | 'initiative'>>
   ) {
     const c = await window.api.character.save(changes)
     setCharacter(c)
