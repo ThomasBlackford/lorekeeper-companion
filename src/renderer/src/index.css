@@ -1,0 +1,86 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Theme variables — the Settings panel toggles these via data-color and
+   data-style attributes on <html>. Tailwind's amber palette, font-display,
+   and rounded-xl/rounded-lg scales are wired to these in tailwind.config.ts,
+   so every component that already uses those utilities re-themes for free.
+   Color values are space-separated RGB channels (not hex) — that's what
+   Tailwind's rgb(var(--x) / <alpha-value>) pattern requires so that
+   opacity modifiers like amber-500/20 keep working. */
+:root {
+  --color-accent-300: 252 211 77;  /* amber-300 */
+  --color-accent-400: 251 191 36;  /* amber-400 */
+  --color-accent-500: 245 158 11;  /* amber-500 */
+  --font-display: 'Cinzel', Georgia, serif;
+  --radius-card: 0.75rem;
+  --radius-input: 0.5rem;
+}
+
+[data-color='crimson'] {
+  --color-accent-300: 252 165 165; /* red-300 */
+  --color-accent-400: 248 113 113; /* red-400 */
+  --color-accent-500: 239 68 68;   /* red-500 */
+}
+
+[data-color='arcane'] {
+  --color-accent-300: 216 180 254; /* purple-300 */
+  --color-accent-400: 192 132 252; /* purple-400 */
+  --color-accent-500: 168 85 247;  /* purple-500 */
+}
+
+[data-style='modern'] {
+  --font-display: 'Inter', system-ui, sans-serif;
+  --radius-card: 0.5rem;
+  --radius-input: 0.375rem;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: #0d1117;
+    color: #e2e8f0;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2a3050;
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #3a4060;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold px-4 py-2 rounded-lg
+           transition-colors duration-150 text-sm;
+  }
+  .btn-ghost {
+    @apply bg-transparent hover:bg-white/5 text-slate-300 hover:text-white px-4 py-2 rounded-lg
+           transition-colors duration-150 text-sm border border-transparent hover:border-white/10;
+  }
+
+  .input {
+    @apply bg-surface-overlay border border-border rounded-lg px-3 py-2 text-sm text-slate-100
+           placeholder:text-slate-500 focus:outline-none focus:border-amber-500/60
+           focus:ring-1 focus:ring-amber-500/30 transition-colors w-full;
+  }
+}
