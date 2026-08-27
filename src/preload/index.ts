@@ -58,6 +58,15 @@ const api = {
       ipcRenderer.on('sync:dmReply', handler)
       return () => ipcRenderer.removeListener('sync:dmReply', handler)
     }
+  },
+  updater: {
+    status: () => ipcRenderer.invoke('updater:status'),
+    install: () => ipcRenderer.invoke('updater:install'),
+    onReady: (cb: () => void) => {
+      const handler = () => cb()
+      ipcRenderer.on('updater:ready', handler)
+      return () => ipcRenderer.removeListener('updater:ready', handler)
+    },
   }
 }
 

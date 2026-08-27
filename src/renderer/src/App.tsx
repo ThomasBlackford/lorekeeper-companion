@@ -11,6 +11,7 @@ import { CharacterTabsCard } from './components/CharacterTabsCard'
 import { NotesSection } from './components/NotesSection'
 import { SettingsButton } from './components/SettingsButton'
 import { ChatWidget } from './components/ChatWidget'
+import { UpdateBanner } from './components/UpdateBanner'
 
 export function App() {
   const { layout } = useSettings()
@@ -136,6 +137,7 @@ export function App() {
 
       <SettingsButton />
       <ChatWidget character={character} onUpdate={setCharacter} />
+      <UpdateBanner />
     </>
   )
 }

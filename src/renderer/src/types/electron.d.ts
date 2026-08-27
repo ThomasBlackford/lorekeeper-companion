@@ -60,6 +60,11 @@ interface ElectronAPI {
     onPartyMessage: (cb: (msg: PartyChatMessage) => void) => () => void
     onDmReply: (cb: (msg: DmReply) => void) => () => void
   }
+  updater: {
+    status: () => Promise<{ ready: boolean }>
+    install: () => Promise<void>
+    onReady: (cb: () => void) => () => void
+  }
 }
 
 declare global {

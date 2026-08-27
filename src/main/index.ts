@@ -5,7 +5,9 @@ import { initDb, getDb } from './db'
 import { setMainWin, getMainWin } from './mainWindow'
 import { registerCharacterHandlers } from './ipc/character'
 import { registerSyncHandlers } from './ipc/sync'
+import { registerUpdaterHandlers } from './ipc/updater'
 import { connect, disconnect } from './sync'
+import { initAutoUpdater } from './updater'
 
 function createWindow(): void {
   const win = new BrowserWindow({
@@ -66,8 +68,13 @@ if (!gotLock) {
     initDb(app.getPath('userData'))
     registerCharacterHandlers()
     registerSyncHandlers()
+    registerUpdaterHandlers()
 
     createWindow()
+
+    // Skipped outside a packaged build — there's no update feed to check
+    // against in dev, and electron-updater errors loudly if it tries.
+    if (app.isPackaged) initAutoUpdater()
 
     // Reconnect to whatever DM server was last used, if any — harmless if
     // it's not reachable, just leaves the app in its normal disconnected
