@@ -47,6 +47,21 @@ export interface Ability {
 export type AbilityScoreKey =
   | 'str_score' | 'dex_score' | 'con_score' | 'int_score' | 'wis_score' | 'cha_score'
 
+// The 18 standard 5E skills. Each is permanently tied to one ability score
+// per the rules, so that mapping lives with the skill list in lib/dnd.ts
+// rather than being stored per-character.
+export type SkillId =
+  | 'acrobatics' | 'animal_handling' | 'arcana' | 'athletics' | 'deception'
+  | 'history' | 'insight' | 'intimidation' | 'investigation' | 'medicine'
+  | 'nature' | 'perception' | 'performance' | 'persuasion' | 'religion'
+  | 'sleight_of_hand' | 'stealth' | 'survival'
+
+// Expertise doubles the proficiency bonus instead of just adding it once —
+// distinct enough from a plain boolean that it needs its own tri-state.
+export type SkillProficiency = 'none' | 'proficient' | 'expertise'
+
+export type SkillProficiencies = Partial<Record<SkillId, SkillProficiency>>
+
 // Matches D&D Beyond's Actions-tab sub-tabs, so filtering feels familiar.
 export type ActionCategory = 'attack' | 'action' | 'bonus_action' | 'reaction' | 'other'
 
@@ -141,6 +156,7 @@ export interface Character {
   proficiency_bonus: number | null
   speed: number | null
   initiative: number | null
+  initiative_bonus: number
   str_score: number
   dex_score: number
   con_score: number
@@ -150,6 +166,7 @@ export interface Character {
   hp_current: number | null
   hp_max: number | null
   spellcasting_ability: AbilityScoreKey | null
+  spellcasting_class: string
   gold: number
   notes: string
   background: Background
@@ -157,6 +174,12 @@ export interface Character {
   resources: Resource[]
   defenses: Defense[]
   conditions: Condition[]
+  skills: SkillProficiencies
+  save_proficiencies: AbilityScoreKey[]
+  armor_proficiencies: string[]
+  weapon_proficiencies: string[]
+  tool_proficiencies: string[]
+  languages: string[]
   spells: Spell[]
   spellSlots: SpellSlot[]
   abilities: Ability[]

@@ -5,7 +5,7 @@ import type { BrowserWindow } from 'electron'
 // the app's entry point.
 let win: BrowserWindow | null = null
 
-export function setMainWin(w: BrowserWindow): void {
+export function setMainWin(w: BrowserWindow | null): void {
   win = w
 }
 

@@ -13,10 +13,13 @@ export interface DmReply {
   at: number
 }
 
+const CONNECT_TIMEOUT_MS = 8000
+
 let ws: WebSocket | null = null
 let address: string | null = null
 let connected = false
 let lastError: string | null = null
+let connectTimeout: ReturnType<typeof setTimeout> | null = null
 const partyMessages: PartyChatMessage[] = []
 const dmReplies: DmReply[] = []
 let cachedClientId: string | null = null
@@ -58,7 +61,9 @@ export function getDmReplies(): DmReply[] {
 
 export function connect(addr: string): { ok: boolean; error?: string } {
   disconnect()
-  address = addr.trim()
+  // Tolerate the DM's address pasted with a scheme or trailing slash — easy
+  // mistakes when copying it out of the chat widget ("ws://192.168.1.5:47337/").
+  address = addr.trim().replace(/^wss?:\/\//i, '').replace(/\/+$/, '')
 
   try {
     ws = new WebSocket(`ws://${address}`)
@@ -69,7 +74,20 @@ export function connect(addr: string): { ok: boolean; error?: string } {
     return { ok: false, error: lastError }
   }
 
+  // A blocked port (Windows Firewall on the DM's PC, different subnets,
+  // wrong address) doesn't always raise a socket error — it can just hang in
+  // "connecting" forever. Without this, the app would sit on "Connecting…"
+  // indefinitely instead of ever telling the player something's wrong.
+  connectTimeout = setTimeout(() => {
+    if (ws && ws.readyState === WebSocket.CONNECTING) {
+      lastError =
+        "Couldn't reach the DM's app after 8 seconds — check you're both on the same WiFi network, the address is correct, and Windows Firewall on the DM's PC allows LoreKeeper."
+      ws.terminate()
+    }
+  }, CONNECT_TIMEOUT_MS)
+
   ws.on('open', () => {
+    if (connectTimeout) { clearTimeout(connectTimeout); connectTimeout = null }
     connected = true
     lastError = null
     pushStatus()
@@ -77,11 +95,13 @@ export function connect(addr: string): { ok: boolean; error?: string } {
   })
 
   ws.on('close', () => {
+    if (connectTimeout) { clearTimeout(connectTimeout); connectTimeout = null }
     connected = false
     pushStatus()
   })
 
   ws.on('error', (err) => {
+    if (connectTimeout) { clearTimeout(connectTimeout); connectTimeout = null }
     lastError = err instanceof Error ? err.message : String(err)
     connected = false
     pushStatus()
@@ -109,6 +129,7 @@ export function connect(addr: string): { ok: boolean; error?: string } {
 }
 
 export function disconnect(): void {
+  if (connectTimeout) { clearTimeout(connectTimeout); connectTimeout = null }
   if (ws) {
     ws.removeAllListeners()
     ws.close()

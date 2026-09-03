@@ -50,9 +50,17 @@ function createSchema(): void {
       dm_server_address TEXT NOT NULL DEFAULT '',
       client_id         TEXT NOT NULL DEFAULT '',
       initiative        INTEGER,
+      initiative_bonus  INTEGER NOT NULL DEFAULT 0,
+      spellcasting_class TEXT NOT NULL DEFAULT '',
       resources         TEXT NOT NULL DEFAULT '[]',
       defenses          TEXT NOT NULL DEFAULT '[]',
-      conditions        TEXT NOT NULL DEFAULT '[]'
+      conditions        TEXT NOT NULL DEFAULT '[]',
+      skills             TEXT NOT NULL DEFAULT '{}',
+      save_proficiencies TEXT NOT NULL DEFAULT '[]',
+      armor_proficiencies TEXT NOT NULL DEFAULT '[]',
+      weapon_proficiencies TEXT NOT NULL DEFAULT '[]',
+      tool_proficiencies TEXT NOT NULL DEFAULT '[]',
+      languages          TEXT NOT NULL DEFAULT '[]'
     );
 
     CREATE TABLE IF NOT EXISTS spells (
@@ -252,5 +260,27 @@ function runMigrations(): void {
       d.exec('ALTER TABLE character ADD COLUMN initiative INTEGER')
     }
     d.prepare('UPDATE schema_version SET version = 5').run()
+  }
+
+  if (v < 6) {
+    // Full skills/proficiencies section: the 18 skill proficiency levels,
+    // saving throw proficiencies, a flat initiative bonus (feats/items on
+    // top of the DEX-derived roll), armor/weapon/tool proficiencies,
+    // languages, and which class's ability drives spellcasting. New installs
+    // already have all of this via createSchema() above.
+    const charCols = d.prepare('PRAGMA table_info(character)').all() as { name: string }[]
+    const charNames = new Set(charCols.map((c) => c.name))
+    const addCharCol = (name: string, def: string): void => {
+      if (!charNames.has(name)) d.exec(`ALTER TABLE character ADD COLUMN ${name} ${def}`)
+    }
+    addCharCol('initiative_bonus', 'INTEGER NOT NULL DEFAULT 0')
+    addCharCol('spellcasting_class', "TEXT NOT NULL DEFAULT ''")
+    addCharCol('skills', "TEXT NOT NULL DEFAULT '{}'")
+    addCharCol('save_proficiencies', "TEXT NOT NULL DEFAULT '[]'")
+    addCharCol('armor_proficiencies', "TEXT NOT NULL DEFAULT '[]'")
+    addCharCol('weapon_proficiencies', "TEXT NOT NULL DEFAULT '[]'")
+    addCharCol('tool_proficiencies', "TEXT NOT NULL DEFAULT '[]'")
+    addCharCol('languages', "TEXT NOT NULL DEFAULT '[]'")
+    d.prepare('UPDATE schema_version SET version = 6').run()
   }
 }

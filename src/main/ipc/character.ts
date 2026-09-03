@@ -16,6 +16,7 @@ interface CharacterRow {
   proficiency_bonus: number | null
   speed: number | null
   initiative: number | null
+  initiative_bonus: number
   str_score: number
   dex_score: number
   con_score: number
@@ -25,6 +26,7 @@ interface CharacterRow {
   hp_current: number | null
   hp_max: number | null
   spellcasting_ability: string | null
+  spellcasting_class: string
   gold: number
   notes: string
   background: string
@@ -32,6 +34,12 @@ interface CharacterRow {
   resources: string
   defenses: string
   conditions: string
+  skills: string
+  save_proficiencies: string
+  armor_proficiencies: string
+  weapon_proficiencies: string
+  tool_proficiencies: string
+  languages: string
 }
 interface SpellRow {
   id: string
@@ -116,6 +124,7 @@ function buildCharacter(db: ReturnType<typeof getDb>) {
     proficiency_bonus: row.proficiency_bonus,
     speed: row.speed,
     initiative: row.initiative,
+    initiative_bonus: row.initiative_bonus,
     str_score: row.str_score,
     dex_score: row.dex_score,
     con_score: row.con_score,
@@ -125,6 +134,7 @@ function buildCharacter(db: ReturnType<typeof getDb>) {
     hp_current: row.hp_current,
     hp_max: row.hp_max,
     spellcasting_ability: row.spellcasting_ability,
+    spellcasting_class: row.spellcasting_class,
     gold: row.gold,
     notes: row.notes,
     background: JSON.parse(row.background || '{}'),
@@ -132,6 +142,12 @@ function buildCharacter(db: ReturnType<typeof getDb>) {
     resources: JSON.parse(row.resources || '[]'),
     defenses: JSON.parse(row.defenses || '[]'),
     conditions: JSON.parse(row.conditions || '[]'),
+    skills: JSON.parse(row.skills || '{}'),
+    save_proficiencies: JSON.parse(row.save_proficiencies || '[]'),
+    armor_proficiencies: JSON.parse(row.armor_proficiencies || '[]'),
+    weapon_proficiencies: JSON.parse(row.weapon_proficiencies || '[]'),
+    tool_proficiencies: JSON.parse(row.tool_proficiencies || '[]'),
+    languages: JSON.parse(row.languages || '[]'),
     spells: spellRows.map((s) => ({
       ...s,
       ritual: !!s.ritual,
@@ -189,6 +205,8 @@ export function registerCharacterHandlers(): void {
       'proficiency_bonus' in changes ? (changes.proficiency_bonus as number | null) : existing.proficiency_bonus
     const speed = 'speed' in changes ? (changes.speed as number | null) : existing.speed
     const initiative = 'initiative' in changes ? (changes.initiative as number | null) : existing.initiative
+    const initiativeBonus =
+      'initiative_bonus' in changes ? (changes.initiative_bonus as number) : existing.initiative_bonus
     const strScore = 'str_score' in changes ? (changes.str_score as number) : existing.str_score
     const dexScore = 'dex_score' in changes ? (changes.dex_score as number) : existing.dex_score
     const conScore = 'con_score' in changes ? (changes.con_score as number) : existing.con_score
@@ -201,22 +219,53 @@ export function registerCharacterHandlers(): void {
       'spellcasting_ability' in changes
         ? (changes.spellcasting_ability as string | null)
         : existing.spellcasting_ability
+    const spellcastingClass =
+      'spellcasting_class' in changes
+        ? (changes.spellcasting_class as string)
+        : existing.spellcasting_class
     const gold = 'gold' in changes ? (changes.gold as number) : existing.gold
     const notes = 'notes' in changes ? (changes.notes as string) : existing.notes
     const dmServerAddress =
       'dm_server_address' in changes ? (changes.dm_server_address as string) : existing.dm_server_address
 
     db.prepare(
-      `UPDATE character SET name=?, race=?, class=?, level=?, alignment=?, ac=?, proficiency_bonus=?, speed=?, initiative=?,
+      `UPDATE character SET name=?, race=?, class=?, level=?, alignment=?, ac=?, proficiency_bonus=?, speed=?, initiative=?, initiative_bonus=?,
        str_score=?, dex_score=?, con_score=?, int_score=?, wis_score=?, cha_score=?, hp_current=?, hp_max=?,
-       spellcasting_ability=?, gold=?, notes=?, dm_server_address=?
+       spellcasting_ability=?, spellcasting_class=?, gold=?, notes=?, dm_server_address=?
        WHERE id=?`
     ).run(
-      name, race, charClass, level, alignment, ac, proficiencyBonus, speed, initiative,
+      name, race, charClass, level, alignment, ac, proficiencyBonus, speed, initiative, initiativeBonus,
       strScore, dexScore, conScore, intScore, wisScore, chaScore, hpCurrent, hpMax,
-      spellcastingAbility, gold, notes, dmServerAddress,
+      spellcastingAbility, spellcastingClass, gold, notes, dmServerAddress,
       CHAR_ID
     )
+    return buildCharacterAndSync(db)
+  })
+
+  ipcMain.handle('character:updateSkills', (_e, skills: unknown) => {
+    const db = getDb()
+    db.prepare('UPDATE character SET skills=? WHERE id=?').run(JSON.stringify(skills), CHAR_ID)
+    return buildCharacterAndSync(db)
+  })
+
+  // One handler for the whole Proficiencies & Languages panel — those five
+  // lists are edited together on one screen, same reasoning as background
+  // being a single blob rather than five separate calls.
+  ipcMain.handle('character:updateProficiencies', (_e, changes: Record<string, unknown>) => {
+    const db = getDb()
+    const existing = db.prepare('SELECT * FROM character WHERE id = ?').get(CHAR_ID) as CharacterRow
+    const saveProficiencies =
+      'save_proficiencies' in changes ? JSON.stringify(changes.save_proficiencies) : existing.save_proficiencies
+    const armorProficiencies =
+      'armor_proficiencies' in changes ? JSON.stringify(changes.armor_proficiencies) : existing.armor_proficiencies
+    const weaponProficiencies =
+      'weapon_proficiencies' in changes ? JSON.stringify(changes.weapon_proficiencies) : existing.weapon_proficiencies
+    const toolProficiencies =
+      'tool_proficiencies' in changes ? JSON.stringify(changes.tool_proficiencies) : existing.tool_proficiencies
+    const languages = 'languages' in changes ? JSON.stringify(changes.languages) : existing.languages
+    db.prepare(
+      `UPDATE character SET save_proficiencies=?, armor_proficiencies=?, weapon_proficiencies=?, tool_proficiencies=?, languages=? WHERE id=?`
+    ).run(saveProficiencies, armorProficiencies, weaponProficiencies, toolProficiencies, languages, CHAR_ID)
     return buildCharacterAndSync(db)
   })
 

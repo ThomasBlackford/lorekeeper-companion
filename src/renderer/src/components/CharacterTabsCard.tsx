@@ -6,6 +6,7 @@ import { InventorySection } from './InventorySection'
 import { ResourceTracker } from './ResourceTracker'
 import { AbilitiesSection } from './AbilitiesSection'
 import { BackgroundSection } from './BackgroundSection'
+import { SkillsSection } from './SkillsSection'
 
 interface Props {
   character: Character
@@ -14,6 +15,7 @@ interface Props {
 
 const TABS = [
   { id: 'actions', label: 'Actions' },
+  { id: 'skills', label: 'Skills' },
   { id: 'spells', label: 'Spells' },
   { id: 'inventory', label: 'Inventory' },
   { id: 'resources', label: 'Resources' },
@@ -56,6 +58,7 @@ export function CharacterTabsCard({ character, onUpdate }: Props) {
 
       <div className="p-4">
         {tab === 'actions' && <ActionsSection character={character} onUpdate={onUpdate} />}
+        {tab === 'skills' && <SkillsSection character={character} onUpdate={onUpdate} />}
         {tab === 'spells' && <SpellsSection character={character} onUpdate={onUpdate} />}
         {tab === 'inventory' && <InventorySection character={character} onUpdate={onUpdate} />}
         {tab === 'resources' && (

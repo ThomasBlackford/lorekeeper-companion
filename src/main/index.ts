@@ -28,6 +28,17 @@ function createWindow(): void {
 
   setMainWin(win)
 
+  // Without this, the module-level reference in mainWindow.ts keeps pointing
+  // at this window after the player closes it — a stale, destroyed
+  // BrowserWindow. If the app hasn't fully exited yet (window-all-closed and
+  // app.quit() are async) and the player double-clicks the exe again in that
+  // window, the single-instance 'second-instance' handler below would call
+  // .isMinimized()/.focus() on that destroyed object and throw "Object has
+  // been destroyed" instead of opening anything.
+  win.on('closed', () => {
+    if (getMainWin() === win) setMainWin(null)
+  })
+
   win.on('ready-to-show', () => win.show())
 
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -52,9 +63,11 @@ if (!gotLock) {
 } else {
   app.on('second-instance', () => {
     const win = getMainWin()
-    if (win) {
+    if (win && !win.isDestroyed()) {
       if (win.isMinimized()) win.restore()
       win.focus()
+    } else {
+      createWindow()
     }
   })
 

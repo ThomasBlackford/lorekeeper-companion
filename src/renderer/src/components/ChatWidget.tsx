@@ -119,11 +119,15 @@ export function ChatWidget({ character, onUpdate }: Props) {
             <div className="p-3 border-b border-border flex-shrink-0 space-y-2">
               <input
                 className="input text-xs py-1.5"
-                placeholder="DM server address"
+                placeholder="e.g. 192.168.1.23:47337"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleConnect()}
               />
+              <p className="text-[10px] text-slate-600">
+                Ask the DM for this — it's shown in their app once they start Player Sync. You both need to be on
+                the same WiFi network.
+              </p>
               <button
                 onClick={handleConnect}
                 disabled={connecting || !address.trim()}

@@ -3,7 +3,7 @@ import { Dices } from 'lucide-react'
 import type { Character } from '../types'
 
 function VitalTile({
-  label, value, onCommit, prefix, suffix, onRoll
+  label, value, onCommit, prefix, suffix, onRoll, rollTitle
 }: {
   label: string
   value: number | null
@@ -11,6 +11,7 @@ function VitalTile({
   prefix?: string
   suffix?: string
   onRoll?: () => void
+  rollTitle?: string
 }) {
   const [text, setText] = useState(value != null ? String(value) : '')
   useEffect(() => setText(value != null ? String(value) : ''), [value])
@@ -36,7 +37,7 @@ function VitalTile({
         {onRoll && (
           <button
             onClick={onRoll}
-            title="Roll d20 + DEX"
+            title={rollTitle ?? 'Roll d20 + DEX'}
             className="text-slate-600 hover:text-amber-300 transition-colors"
           >
             <Dices size={13} />
@@ -55,7 +56,7 @@ interface Props {
 export function VitalsRow({ character, onChange }: Props) {
   function rollInitiative() {
     const dexMod = Math.floor((character.dex_score - 10) / 2)
-    onChange({ initiative: Math.floor(Math.random() * 20) + 1 + dexMod })
+    onChange({ initiative: Math.floor(Math.random() * 20) + 1 + dexMod + character.initiative_bonus })
   }
 
   return (
@@ -68,6 +69,7 @@ export function VitalsRow({ character, onChange }: Props) {
         value={character.initiative}
         onCommit={(v) => onChange({ initiative: v })}
         onRoll={rollInitiative}
+        rollTitle={`Roll d20 + DEX${character.initiative_bonus ? ` ${character.initiative_bonus >= 0 ? '+' : ''}${character.initiative_bonus} bonus` : ''}`}
       />
     </div>
   )

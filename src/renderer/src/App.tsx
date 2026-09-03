@@ -7,6 +7,7 @@ import { HpCard } from './components/HpCard'
 import { RestButtons } from './components/RestButtons'
 import { DefensesList } from './components/DefensesList'
 import { ConditionsCard } from './components/ConditionsCard'
+import { PassiveScoresCard } from './components/PassiveScoresCard'
 import { CharacterTabsCard } from './components/CharacterTabsCard'
 import { NotesSection } from './components/NotesSection'
 import { SettingsButton } from './components/SettingsButton'
@@ -107,6 +108,8 @@ export function App() {
         <DefensesList defenses={character.defenses} onChange={handleDefensesChange} />
         <ConditionsCard conditions={character.conditions} onChange={handleConditionsChange} />
       </div>
+
+      <PassiveScoresCard character={character} />
     </>
   )
 

@@ -1,21 +1,7 @@
 import type { AbilityScoreKey, Character } from '../types'
+import { ABILITY_ORDER, ABILITY_SHORT, abilityMod, fmtMod } from '../lib/dnd'
 
-const STATS: { key: AbilityScoreKey; label: string }[] = [
-  { key: 'str_score', label: 'STR' },
-  { key: 'dex_score', label: 'DEX' },
-  { key: 'con_score', label: 'CON' },
-  { key: 'int_score', label: 'INT' },
-  { key: 'wis_score', label: 'WIS' },
-  { key: 'cha_score', label: 'CHA' }
-]
-
-function mod(score: number): number {
-  return Math.floor((score - 10) / 2)
-}
-
-function fmtMod(m: number): string {
-  return m >= 0 ? `+${m}` : `${m}`
-}
+const STATS = ABILITY_ORDER.map((key) => ({ key, label: ABILITY_SHORT[key] }))
 
 interface Props {
   character: Character
@@ -39,7 +25,7 @@ export function AbilityScores({ character, onChange }: Props) {
               value={score}
               onChange={(e) => onChange(s.key, parseInt(e.target.value) || 0)}
             />
-            <span className="text-xs text-amber-400/80">{fmtMod(mod(score))}</span>
+            <span className="text-xs text-amber-400/80">{fmtMod(abilityMod(score))}</span>
           </div>
         )
       })}

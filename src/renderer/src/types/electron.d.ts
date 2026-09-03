@@ -1,6 +1,6 @@
 import type {
   Ability, Background, Character, CombatAction, Condition, Defense, DmReply,
-  InventoryItem, PartyChatMessage, Resource, Spell, SyncStatus
+  InventoryItem, PartyChatMessage, Resource, SkillProficiencies, Spell, SyncStatus
 } from './index'
 
 interface ElectronAPI {
@@ -11,10 +11,10 @@ interface ElectronAPI {
         Pick<
           Character,
           | 'name' | 'race' | 'class' | 'level' | 'alignment'
-          | 'ac' | 'proficiency_bonus' | 'speed' | 'initiative'
+          | 'ac' | 'proficiency_bonus' | 'speed' | 'initiative' | 'initiative_bonus'
           | 'str_score' | 'dex_score' | 'con_score' | 'int_score' | 'wis_score' | 'cha_score'
           | 'hp_current' | 'hp_max'
-          | 'spellcasting_ability' | 'gold' | 'notes' | 'dm_server_address'
+          | 'spellcasting_ability' | 'spellcasting_class' | 'gold' | 'notes' | 'dm_server_address'
         >
       >
     ) => Promise<Character>
@@ -22,6 +22,15 @@ interface ElectronAPI {
     updateDefenses: (defenses: Defense[]) => Promise<Character>
     updateConditions: (conditions: Condition[]) => Promise<Character>
     updateBackground: (background: Background) => Promise<Character>
+    updateSkills: (skills: SkillProficiencies) => Promise<Character>
+    updateProficiencies: (
+      changes: Partial<
+        Pick<
+          Character,
+          'save_proficiencies' | 'armor_proficiencies' | 'weapon_proficiencies' | 'tool_proficiencies' | 'languages'
+        >
+      >
+    ) => Promise<Character>
   }
   spells: {
     add: (data: Partial<Spell> & { name: string }) => Promise<Character>

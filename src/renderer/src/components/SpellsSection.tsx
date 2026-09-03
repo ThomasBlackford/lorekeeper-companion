@@ -23,8 +23,8 @@ export function SpellsSection({ character, onUpdate }: Props) {
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
 
-  async function handleAbilityChange(ability: AbilityScoreKey | null) {
-    const c = await window.api.character.save({ spellcasting_ability: ability })
+  async function handleSpellcastingChange(changes: { spellcasting_ability: AbilityScoreKey | null; spellcasting_class: string }) {
+    const c = await window.api.character.save(changes)
     onUpdate(c)
   }
 
@@ -74,7 +74,7 @@ export function SpellsSection({ character, onUpdate }: Props) {
         </button>
       </div>
 
-      <SpellcastingStats character={character} onChange={handleAbilityChange} />
+      <SpellcastingStats character={character} onChange={handleSpellcastingChange} />
       <SpellSlots slots={character.spellSlots} onChange={handleSlotChange} />
 
       <div className="relative mt-3">

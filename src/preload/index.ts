@@ -7,7 +7,10 @@ const api = {
     updateResources: (resources: unknown[]) => ipcRenderer.invoke('character:updateResources', resources),
     updateDefenses: (defenses: unknown[]) => ipcRenderer.invoke('character:updateDefenses', defenses),
     updateConditions: (conditions: unknown[]) => ipcRenderer.invoke('character:updateConditions', conditions),
-    updateBackground: (background: unknown) => ipcRenderer.invoke('character:updateBackground', background)
+    updateBackground: (background: unknown) => ipcRenderer.invoke('character:updateBackground', background),
+    updateSkills: (skills: unknown) => ipcRenderer.invoke('character:updateSkills', skills),
+    updateProficiencies: (changes: Record<string, unknown>) =>
+      ipcRenderer.invoke('character:updateProficiencies', changes)
   },
   spells: {
     add: (data: Record<string, unknown>) => ipcRenderer.invoke('spells:add', data),
