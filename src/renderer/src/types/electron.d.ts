@@ -13,7 +13,9 @@ interface ElectronAPI {
           | 'name' | 'race' | 'class' | 'level' | 'alignment'
           | 'ac' | 'proficiency_bonus' | 'speed' | 'initiative' | 'initiative_bonus'
           | 'str_score' | 'dex_score' | 'con_score' | 'int_score' | 'wis_score' | 'cha_score'
-          | 'hp_current' | 'hp_max'
+          | 'hp_current' | 'hp_max' | 'hp_temp' | 'death_save_successes' | 'death_save_failures'
+          | 'hit_dice_total' | 'hit_dice_current' | 'hit_die_size' | 'inspiration' | 'concentration_spell_name'
+          | 'exhaustion_level'
           | 'spellcasting_ability' | 'spellcasting_class' | 'gold' | 'notes' | 'dm_server_address'
         >
       >
@@ -58,6 +60,9 @@ interface ElectronAPI {
   rest: {
     short: () => Promise<Character>
     long: () => Promise<Character>
+  }
+  hitDice: {
+    spend: () => Promise<{ character: Character; rolled: number; healed?: number }>
   }
   sync: {
     connect: (address: string) => Promise<{ ok: boolean; error?: string }>

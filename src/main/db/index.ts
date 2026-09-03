@@ -43,6 +43,15 @@ function createSchema(): void {
       cha_score         INTEGER NOT NULL DEFAULT 10,
       hp_current        INTEGER,
       hp_max            INTEGER,
+      hp_temp           INTEGER NOT NULL DEFAULT 0,
+      death_save_successes INTEGER NOT NULL DEFAULT 0,
+      death_save_failures  INTEGER NOT NULL DEFAULT 0,
+      hit_dice_total    INTEGER,
+      hit_dice_current  INTEGER,
+      hit_die_size      TEXT NOT NULL DEFAULT 'd8',
+      inspiration       INTEGER NOT NULL DEFAULT 0,
+      concentration_spell_name TEXT NOT NULL DEFAULT '',
+      exhaustion_level  INTEGER NOT NULL DEFAULT 0,
       spellcasting_ability TEXT,
       gold              INTEGER NOT NULL DEFAULT 0,
       notes             TEXT NOT NULL DEFAULT '',
@@ -282,5 +291,36 @@ function runMigrations(): void {
     addCharCol('tool_proficiencies', "TEXT NOT NULL DEFAULT '[]'")
     addCharCol('languages', "TEXT NOT NULL DEFAULT '[]'")
     d.prepare('UPDATE schema_version SET version = 6').run()
+  }
+
+  if (v < 7) {
+    // Combat essentials that were missing entirely: temp HP, death saves,
+    // a hit dice pool (for short rests), inspiration, and a concentration
+    // indicator. New installs already have all of this via createSchema().
+    const charCols = d.prepare('PRAGMA table_info(character)').all() as { name: string }[]
+    const charNames = new Set(charCols.map((c) => c.name))
+    const addCharCol = (name: string, def: string): void => {
+      if (!charNames.has(name)) d.exec(`ALTER TABLE character ADD COLUMN ${name} ${def}`)
+    }
+    addCharCol('hp_temp', 'INTEGER NOT NULL DEFAULT 0')
+    addCharCol('death_save_successes', 'INTEGER NOT NULL DEFAULT 0')
+    addCharCol('death_save_failures', 'INTEGER NOT NULL DEFAULT 0')
+    addCharCol('hit_dice_total', 'INTEGER')
+    addCharCol('hit_dice_current', 'INTEGER')
+    addCharCol('hit_die_size', "TEXT NOT NULL DEFAULT 'd8'")
+    addCharCol('inspiration', 'INTEGER NOT NULL DEFAULT 0')
+    addCharCol('concentration_spell_name', "TEXT NOT NULL DEFAULT ''")
+    d.prepare('UPDATE schema_version SET version = 7').run()
+  }
+
+  if (v < 8) {
+    // Exhaustion has escalating levels (1-6) under 5E rules, not just an
+    // on/off state — tracked separately from the fixed Exhausted condition
+    // badge so it doesn't have to become a special case there.
+    const charCols = d.prepare('PRAGMA table_info(character)').all() as { name: string }[]
+    if (!charCols.some((c) => c.name === 'exhaustion_level')) {
+      d.exec('ALTER TABLE character ADD COLUMN exhaustion_level INTEGER NOT NULL DEFAULT 0')
+    }
+    d.prepare('UPDATE schema_version SET version = 8').run()
   }
 }

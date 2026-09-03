@@ -1,7 +1,9 @@
+import { useState } from 'react'
+import { Dices } from 'lucide-react'
 import type { AbilityScoreKey, Character, SkillId, SkillProficiency } from '../types'
 import {
-  ABILITY_ORDER, ABILITY_SHORT, SKILLS,
-  abilityMod, fmtMod, proficiencyBonusForLevel, saveModifier, skillModifier
+  ABILITY_ORDER, ABILITY_SHORT, EXHAUSTION_EFFECTS, SKILLS,
+  abilityMod, fmtMod, proficiencyBonusForLevel, rollD20, saveModifier, skillModifier
 } from '../lib/dnd'
 import { Stepper } from './Stepper'
 import { ProficienciesPanel } from './ProficienciesPanel'
@@ -21,7 +23,42 @@ function ProfMark({ level }: { level: SkillProficiency }) {
   return <span className="text-slate-700 text-[11px] leading-none">○</span>
 }
 
+// Shows the roll total in place of the static modifier for a couple of
+// seconds after the dice is clicked, then reverts — an ephemeral flash
+// rather than persisted state, since a skill/save check isn't something the
+// sheet needs to remember.
+function RollableValue({ rollKey, modifier, rolls, onRoll }: {
+  rollKey: string
+  modifier: number
+  rolls: Record<string, number>
+  onRoll: (key: string, mod: number) => void
+}) {
+  const rolled = rolls[rollKey]
+  return (
+    <>
+      <button
+        onClick={(e) => { e.stopPropagation(); onRoll(rollKey, modifier) }}
+        title="Roll d20 + modifier"
+        className="text-slate-600 hover:text-amber-300 transition-colors flex-shrink-0"
+      >
+        <Dices size={12} />
+      </button>
+      <span className={`text-sm font-display font-semibold w-10 text-right flex-shrink-0 ${rolled != null ? 'text-amber-300' : 'text-slate-100'}`}>
+        {rolled != null ? rolled : fmtMod(modifier)}
+      </span>
+    </>
+  )
+}
+
 export function SkillsSection({ character, onUpdate }: Props) {
+  const [rolls, setRolls] = useState<Record<string, number>>({})
+
+  function handleRoll(key: string, modifier: number) {
+    const total = rollD20() + modifier
+    setRolls((prev) => ({ ...prev, [key]: total }))
+    setTimeout(() => setRolls((prev) => { const { [key]: _drop, ...rest } = prev; return rest }), 2500)
+  }
+
   async function setSkill(key: SkillId, level: SkillProficiency) {
     const skills = { ...character.skills, [key]: level }
     const c = await window.api.character.updateSkills(skills)
@@ -39,6 +76,11 @@ export function SkillsSection({ character, onUpdate }: Props) {
 
   async function setInitiativeBonus(v: number) {
     const c = await window.api.character.save({ initiative_bonus: v })
+    onUpdate(c)
+  }
+
+  async function setExhaustion(v: number) {
+    const c = await window.api.character.save({ exhaustion_level: Math.max(0, Math.min(6, v)) })
     onUpdate(c)
   }
 
@@ -73,6 +115,14 @@ export function SkillsSection({ character, onUpdate }: Props) {
             = {fmtMod(initTotal)} total (DEX {fmtMod(dexMod)} + bonus)
           </span>
         </div>
+
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-slate-500">Exhaustion</span>
+          <Stepper value={character.exhaustion_level} onChange={setExhaustion} min={0} max={6} format="plain" />
+          <span className={`text-[11px] ${character.exhaustion_level > 0 ? 'text-red-400/80' : 'text-slate-600'}`}>
+            {EXHAUSTION_EFFECTS[character.exhaustion_level]}
+          </span>
+        </div>
       </div>
 
       <div>
@@ -82,22 +132,24 @@ export function SkillsSection({ character, onUpdate }: Props) {
             const proficient = character.save_proficiencies.includes(ability)
             const value = saveModifier(character, ability, proficient)
             return (
-              <button
+              <div
                 key={ability}
-                onClick={() => toggleSave(ability)}
-                title="Click to toggle proficiency"
-                className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${
+                className={`flex items-center justify-between gap-1.5 pl-2.5 pr-1.5 py-1 rounded-lg border text-xs transition-colors ${
                   proficient
                     ? 'bg-amber-500/10 border-amber-500/30 text-amber-200'
                     : 'bg-surface-overlay border-border text-slate-400 hover:border-slate-600'
                 }`}
               >
-                <span className="flex items-center gap-1.5">
+                <button
+                  onClick={() => toggleSave(ability)}
+                  title="Click to toggle proficiency"
+                  className="flex items-center gap-1.5 flex-1 py-0.5"
+                >
                   <ProfMark level={proficient ? 'proficient' : 'none'} />
                   {ABILITY_SHORT[ability]}
-                </span>
-                <span className="font-display font-semibold">{fmtMod(value)}</span>
-              </button>
+                </button>
+                <RollableValue rollKey={`save:${ability}`} modifier={value} rolls={rolls} onRoll={handleRoll} />
+              </div>
             )
           })}
         </div>
@@ -110,17 +162,21 @@ export function SkillsSection({ character, onUpdate }: Props) {
             const level = character.skills[skill.key] ?? 'none'
             const value = skillModifier(character, skill, level)
             return (
-              <button
+              <div
                 key={skill.key}
-                onClick={() => setSkill(skill.key, cycleProficiency(level))}
-                title="Click to cycle: not proficient → proficient → expertise"
-                className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-white/5 transition-colors text-left"
+                className="w-full flex items-center gap-2.5 px-2 py-1 rounded-lg hover:bg-white/5 transition-colors"
               >
-                <ProfMark level={level} />
-                <span className="text-sm text-slate-200 flex-1">{skill.label}</span>
-                <span className="text-[10px] uppercase text-slate-600 w-8">{ABILITY_SHORT[skill.ability]}</span>
-                <span className="text-sm font-display font-semibold text-slate-100 w-8 text-right">{fmtMod(value)}</span>
-              </button>
+                <button
+                  onClick={() => setSkill(skill.key, cycleProficiency(level))}
+                  title="Click to cycle: not proficient → proficient → expertise"
+                  className="flex items-center gap-2.5 flex-1 min-w-0 py-0.5 text-left"
+                >
+                  <ProfMark level={level} />
+                  <span className="text-sm text-slate-200">{skill.label}</span>
+                </button>
+                <span className="text-[10px] uppercase text-slate-600 w-8 flex-shrink-0">{ABILITY_SHORT[skill.ability]}</span>
+                <RollableValue rollKey={`skill:${skill.key}`} modifier={value} rolls={rolls} onRoll={handleRoll} />
+              </div>
             )
           })}
         </div>

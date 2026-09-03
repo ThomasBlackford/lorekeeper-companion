@@ -25,6 +25,15 @@ interface CharacterRow {
   cha_score: number
   hp_current: number | null
   hp_max: number | null
+  hp_temp: number
+  death_save_successes: number
+  death_save_failures: number
+  hit_dice_total: number | null
+  hit_dice_current: number | null
+  hit_die_size: string
+  inspiration: number
+  concentration_spell_name: string
+  exhaustion_level: number
   spellcasting_ability: string | null
   spellcasting_class: string
   gold: number
@@ -133,6 +142,15 @@ function buildCharacter(db: ReturnType<typeof getDb>) {
     cha_score: row.cha_score,
     hp_current: row.hp_current,
     hp_max: row.hp_max,
+    hp_temp: row.hp_temp,
+    death_save_successes: row.death_save_successes,
+    death_save_failures: row.death_save_failures,
+    hit_dice_total: row.hit_dice_total,
+    hit_dice_current: row.hit_dice_current,
+    hit_die_size: row.hit_die_size,
+    inspiration: !!row.inspiration,
+    concentration_spell_name: row.concentration_spell_name,
+    exhaustion_level: row.exhaustion_level,
     spellcasting_ability: row.spellcasting_ability,
     spellcasting_class: row.spellcasting_class,
     gold: row.gold,
@@ -176,6 +194,8 @@ function buildCharacterAndSync(db: ReturnType<typeof getDb>) {
     initiative: character.initiative,
     hp_current: character.hp_current,
     hp_max: character.hp_max,
+    hp_temp: character.hp_temp,
+    inspiration: character.inspiration,
     spellSlots: character.spellSlots,
     resources: character.resources,
     conditions: character.conditions
@@ -215,6 +235,36 @@ export function registerCharacterHandlers(): void {
     const chaScore = 'cha_score' in changes ? (changes.cha_score as number) : existing.cha_score
     const hpCurrent = 'hp_current' in changes ? (changes.hp_current as number | null) : existing.hp_current
     const hpMax = 'hp_max' in changes ? (changes.hp_max as number | null) : existing.hp_max
+    const hpTemp = 'hp_temp' in changes ? (changes.hp_temp as number) : existing.hp_temp
+    const hitDiceTotal =
+      'hit_dice_total' in changes ? (changes.hit_dice_total as number | null) : existing.hit_dice_total
+    const hitDiceCurrent =
+      'hit_dice_current' in changes ? (changes.hit_dice_current as number | null) : existing.hit_dice_current
+    const hitDieSize = 'hit_die_size' in changes ? (changes.hit_die_size as string) : existing.hit_die_size
+    const inspiration =
+      'inspiration' in changes ? (changes.inspiration ? 1 : 0) : existing.inspiration
+    const concentrationSpellName =
+      'concentration_spell_name' in changes
+        ? (changes.concentration_spell_name as string)
+        : existing.concentration_spell_name
+    const exhaustionLevel =
+      'exhaustion_level' in changes ? (changes.exhaustion_level as number) : existing.exhaustion_level
+
+    // Dropping to 0 (down) or coming back above 0 (healed/stabilized) both
+    // start a fresh death-save sequence — explicit changes to the counters
+    // themselves (the death-save buttons) still take priority over this.
+    let deathSaveSuccesses = existing.death_save_successes
+    let deathSaveFailures = existing.death_save_failures
+    if ('hp_current' in changes) {
+      const wasUp = existing.hp_current == null || existing.hp_current > 0
+      const isUp = hpCurrent != null && hpCurrent > 0
+      if (isUp || (!isUp && wasUp)) {
+        deathSaveSuccesses = 0
+        deathSaveFailures = 0
+      }
+    }
+    if ('death_save_successes' in changes) deathSaveSuccesses = changes.death_save_successes as number
+    if ('death_save_failures' in changes) deathSaveFailures = changes.death_save_failures as number
     const spellcastingAbility =
       'spellcasting_ability' in changes
         ? (changes.spellcasting_ability as string | null)
@@ -230,12 +280,16 @@ export function registerCharacterHandlers(): void {
 
     db.prepare(
       `UPDATE character SET name=?, race=?, class=?, level=?, alignment=?, ac=?, proficiency_bonus=?, speed=?, initiative=?, initiative_bonus=?,
-       str_score=?, dex_score=?, con_score=?, int_score=?, wis_score=?, cha_score=?, hp_current=?, hp_max=?,
+       str_score=?, dex_score=?, con_score=?, int_score=?, wis_score=?, cha_score=?, hp_current=?, hp_max=?, hp_temp=?,
+       death_save_successes=?, death_save_failures=?, hit_dice_total=?, hit_dice_current=?, hit_die_size=?,
+       inspiration=?, concentration_spell_name=?, exhaustion_level=?,
        spellcasting_ability=?, spellcasting_class=?, gold=?, notes=?, dm_server_address=?
        WHERE id=?`
     ).run(
       name, race, charClass, level, alignment, ac, proficiencyBonus, speed, initiative, initiativeBonus,
-      strScore, dexScore, conScore, intScore, wisScore, chaScore, hpCurrent, hpMax,
+      strScore, dexScore, conScore, intScore, wisScore, chaScore, hpCurrent, hpMax, hpTemp,
+      deathSaveSuccesses, deathSaveFailures, hitDiceTotal, hitDiceCurrent, hitDieSize,
+      inspiration, concentrationSpellName, exhaustionLevel,
       spellcastingAbility, spellcastingClass, gold, notes, dmServerAddress,
       CHAR_ID
     )
@@ -592,6 +646,31 @@ export function registerCharacterHandlers(): void {
     return buildCharacterAndSync(db)
   })
 
+  // ── Hit dice ────────────────────────────────────────────────────────────
+  // Spending a Hit Die during a short rest is a player choice, not an
+  // automatic recharge — this rolls it (+ CON modifier, per 5E) and applies
+  // the healing in one step instead of making the player do that math by
+  // hand and then type the result into the HP delta box.
+  ipcMain.handle('hitDice:spend', () => {
+    const db = getDb()
+    const row = db.prepare("SELECT * FROM character WHERE id='local'").get() as CharacterRow
+    if (!row.hit_dice_current || row.hit_dice_current <= 0) return { character: buildCharacter(db), rolled: 0 }
+
+    const dieMax = parseInt(row.hit_die_size.replace(/^d/i, ''), 10) || 8
+    const roll = Math.floor(Math.random() * dieMax) + 1
+    const conMod = Math.floor((row.con_score - 10) / 2)
+    const healed = Math.max(1, roll + conMod) // a Hit Die always heals at least 1
+
+    const nextCurrent = (row.hp_current ?? 0) + healed
+    const cappedCurrent = row.hp_max != null ? Math.min(row.hp_max, nextCurrent) : nextCurrent
+
+    db.prepare("UPDATE character SET hit_dice_current=?, hp_current=? WHERE id='local'").run(
+      row.hit_dice_current - 1,
+      cappedCurrent
+    )
+    return { character: buildCharacterAndSync(db), rolled: roll, healed }
+  })
+
   // ── Rest ────────────────────────────────────────────────────────────────
   // A long rest restores everything a short rest does, plus spell slots.
   // "dawn" and "custom" recharges are intentionally left out of both — they
@@ -618,6 +697,22 @@ export function registerCharacterHandlers(): void {
       "UPDATE actions SET current_uses = max_uses WHERE recharge IN ('short_rest','long_rest') AND max_uses IS NOT NULL"
     ).run()
     db.prepare('UPDATE spell_slots SET current = max').run()
+
+    // 5E: a long rest regains spent Hit Dice, up to half your total (min 1)
+    // — never the whole pool back at once. Temp HP doesn't survive a long
+    // rest either (PHB: "until they're depleted or you finish a long rest").
+    const character = db.prepare("SELECT hit_dice_total, hit_dice_current FROM character WHERE id='local'").get() as
+      | { hit_dice_total: number | null; hit_dice_current: number | null }
+      | undefined
+    if (character?.hit_dice_total != null) {
+      const total = character.hit_dice_total
+      const current = character.hit_dice_current ?? total
+      const regained = Math.max(1, Math.floor(total / 2))
+      const next = Math.min(total, current + regained)
+      db.prepare("UPDATE character SET hit_dice_current=? WHERE id='local'").run(next)
+    }
+    db.prepare("UPDATE character SET hp_temp=0 WHERE id='local'").run()
+
     return buildCharacterAndSync(db)
   })
 }

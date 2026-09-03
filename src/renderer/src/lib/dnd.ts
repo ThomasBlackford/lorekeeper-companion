@@ -93,6 +93,23 @@ export const SPELLCASTING_CLASS_OPTIONS: { label: string; ability: AbilityScoreK
   { label: 'Warlock', ability: 'cha_score' }
 ]
 
+// 5E exhaustion is cumulative and escalating, not a single on/off condition
+// — index 0 is "none," each level below applies in addition to the ones
+// above it.
+export const EXHAUSTION_EFFECTS = [
+  'None',
+  'Disadvantage on ability checks',
+  'Speed halved',
+  'Disadvantage on attack rolls and saving throws',
+  'Hit point maximum halved',
+  'Speed reduced to 0',
+  'Death'
+]
+
+export function rollD20(): number {
+  return Math.floor(Math.random() * 20) + 1
+}
+
 export const ARMOR_PROFICIENCY_OPTIONS = ['Light Armor', 'Medium Armor', 'Heavy Armor', 'Shields']
 export const WEAPON_PROFICIENCY_PRESETS = ['Simple Weapons', 'Martial Weapons']
 export const COMMON_LANGUAGES = [

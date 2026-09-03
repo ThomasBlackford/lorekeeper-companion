@@ -165,6 +165,15 @@ export interface Character {
   cha_score: number
   hp_current: number | null
   hp_max: number | null
+  hp_temp: number
+  death_save_successes: number
+  death_save_failures: number
+  hit_dice_total: number | null
+  hit_dice_current: number | null
+  hit_die_size: string // 'd6' | 'd8' | 'd10' | 'd12', free text so homebrew isn't blocked
+  inspiration: boolean
+  concentration_spell_name: string // '' = not concentrating on anything
+  exhaustion_level: number // 0-6, per 5E's escalating exhaustion levels
   spellcasting_ability: AbilityScoreKey | null
   spellcasting_class: string
   gold: number

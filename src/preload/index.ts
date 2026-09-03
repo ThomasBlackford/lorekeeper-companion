@@ -40,6 +40,9 @@ const api = {
     short: () => ipcRenderer.invoke('rest:short'),
     long: () => ipcRenderer.invoke('rest:long')
   },
+  hitDice: {
+    spend: () => ipcRenderer.invoke('hitDice:spend')
+  },
   sync: {
     connect: (address: string) => ipcRenderer.invoke('sync:connect', address),
     disconnect: () => ipcRenderer.invoke('sync:disconnect'),

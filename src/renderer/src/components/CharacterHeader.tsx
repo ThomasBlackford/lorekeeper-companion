@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
+import { Star } from 'lucide-react'
 import type { Character } from '../types'
 
 interface Props {
   character: Character
-  onSave: (changes: Partial<Pick<Character, 'name' | 'race' | 'class' | 'level' | 'alignment'>>) => void
+  onSave: (changes: Partial<Pick<Character, 'name' | 'race' | 'class' | 'level' | 'alignment' | 'inspiration'>>) => void
 }
 
 export function CharacterHeader({ character, onSave }: Props) {
@@ -26,15 +27,26 @@ export function CharacterHeader({ character, onSave }: Props) {
 
   return (
     <div className="text-center pt-2 space-y-2">
-      <input
-        className="w-full text-center bg-transparent font-display text-2xl font-semibold text-white
-                   focus:outline-none focus:bg-surface-overlay rounded-lg py-1 transition-colors"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        onBlur={() => onSave({ name })}
-        onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-        placeholder="Character Name"
-      />
+      <div className="relative">
+        <input
+          className="w-full text-center bg-transparent font-display text-2xl font-semibold text-white
+                     focus:outline-none focus:bg-surface-overlay rounded-lg py-1 transition-colors"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={() => onSave({ name })}
+          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+          placeholder="Character Name"
+        />
+        <button
+          onClick={() => onSave({ inspiration: !character.inspiration })}
+          title={character.inspiration ? 'Inspired (click to use it)' : 'No inspiration — click to grant'}
+          className={`absolute right-1 top-1/2 -translate-y-1/2 p-1.5 rounded-full transition-colors ${
+            character.inspiration ? 'text-amber-300' : 'text-slate-700 hover:text-slate-500'
+          }`}
+        >
+          <Star size={16} fill={character.inspiration ? 'currentColor' : 'none'} />
+        </button>
+      </div>
 
       <div className="flex items-center justify-center gap-2 flex-wrap text-sm">
         <input

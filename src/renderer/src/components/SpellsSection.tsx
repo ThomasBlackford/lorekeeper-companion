@@ -33,6 +33,12 @@ export function SpellsSection({ character, onUpdate }: Props) {
     onUpdate(c)
   }
 
+  async function handleToggleConcentration(spellName: string) {
+    const next = character.concentration_spell_name === spellName ? '' : spellName
+    const c = await window.api.character.save({ concentration_spell_name: next })
+    onUpdate(c)
+  }
+
   async function handleAdd(data: Partial<Spell> & { name: string }) {
     const c = await window.api.spells.add(data)
     onUpdate(c)
@@ -142,7 +148,9 @@ export function SpellsSection({ character, onUpdate }: Props) {
                     <SpellRow
                       key={s.id}
                       spell={s}
+                      isConcentrating={character.concentration_spell_name === s.name}
                       onTogglePrepared={() => handleUpdate(s.id, { prepared: !s.prepared })}
+                      onToggleConcentration={() => handleToggleConcentration(s.name)}
                       onEdit={() => setEditingId(s.id)}
                     />
                   )

@@ -27,7 +27,7 @@ export function App() {
   }, [])
 
   async function handleSaveHeader(
-    changes: Partial<Pick<Character, 'name' | 'race' | 'class' | 'level' | 'alignment'>>
+    changes: Partial<Pick<Character, 'name' | 'race' | 'class' | 'level' | 'alignment' | 'inspiration'>>
   ) {
     const c = await window.api.character.save(changes)
     setCharacter(c)
@@ -45,7 +45,12 @@ export function App() {
     setCharacter(c)
   }
 
-  async function handleHpChange(changes: { hp_current?: number | null; hp_max?: number | null }) {
+  async function handleHpChange(
+    changes: Partial<Pick<Character,
+      'hp_current' | 'hp_max' | 'hp_temp' | 'death_save_successes' | 'death_save_failures'
+      | 'hit_dice_total' | 'hit_dice_current' | 'hit_die_size'
+    >>
+  ) {
     const c = await window.api.character.save(changes)
     setCharacter(c)
   }
