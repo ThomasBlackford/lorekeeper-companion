@@ -100,11 +100,11 @@ export function ChatWidget({ character, onUpdate }: Props) {
                    hover:text-amber-300 hover:border-amber-500/40 transition-colors"
       >
         <MessageSquare size={17} />
-        {unread && <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-amber-400" />}
+        {unread && <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />}
       </button>
 
       {open && (
-        <div className="fixed bottom-[4.75rem] right-4 z-40 w-80 max-h-[32rem] bg-surface-raised border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden">
+        <div className="fixed bottom-[4.75rem] right-4 z-40 w-80 max-h-[32rem] bg-surface-raised border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden animate-popover origin-bottom-right">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border flex-shrink-0">
             <div className="flex items-center gap-1.5">
               {status.connected ? <Wifi size={13} className="text-emerald-400" /> : <WifiOff size={13} className="text-slate-600" />}

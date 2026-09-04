@@ -1,5 +1,7 @@
-import { Pencil, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { Info, Pencil, Trash2 } from 'lucide-react'
 import type { CombatAction } from '../types'
+import { DetailCard } from './DetailCard'
 
 const CATEGORY_LABEL: Record<string, string> = {
   attack: 'Attack',
@@ -7,6 +9,10 @@ const CATEGORY_LABEL: Record<string, string> = {
   bonus_action: 'Bonus Action',
   reaction: 'Reaction',
   other: 'Other'
+}
+
+const RECHARGE_LABEL: Record<string, string> = {
+  short_rest: 'Short Rest', long_rest: 'Long Rest', dawn: 'Dawn', unlimited: 'Unlimited'
 }
 
 function formatHitDc(action: CombatAction): string {
@@ -29,49 +35,81 @@ interface Props {
 
 export function ActionRow({ action, onEdit, onDelete, onUse, onRestore }: Props) {
   const hasUses = action.max_uses != null
+  const [showCard, setShowCard] = useState(false)
 
   return (
-    <div className="flex items-center gap-3 px-2.5 py-2 rounded-lg bg-surface-overlay/50 hover:bg-surface-overlay transition-colors text-xs">
-      <div className="w-32 flex-shrink-0 min-w-0">
-        <p className="text-slate-200 font-medium truncate">{action.name}</p>
-        {action.weapon_type && <p className="text-[10px] text-slate-600 truncate">{action.weapon_type}</p>}
+    <div className="rounded-lg bg-surface-overlay/50 hover:bg-surface-overlay transition-colors text-xs row-interactive">
+      <div className="flex items-center gap-3 px-2.5 py-2">
+        <button
+          onClick={() => setShowCard(true)}
+          title="Click to see the full entry"
+          className="w-32 flex-shrink-0 min-w-0 text-left flex items-center gap-1.5"
+        >
+          <Info size={11} className="text-slate-600 flex-shrink-0" />
+          <span className="min-w-0">
+            <p className="text-slate-200 font-medium truncate">{action.name}</p>
+            {action.weapon_type && <p className="text-[10px] text-slate-600 truncate">{action.weapon_type}</p>}
+          </span>
+        </button>
+        <span className="w-20 flex-shrink-0 text-slate-400 truncate">{action.range || '—'}</span>
+        <span className="w-12 flex-shrink-0 text-amber-300 font-medium">{formatHitDc(action)}</span>
+        <span className="w-28 flex-shrink-0 text-slate-300 truncate">
+          {action.damage || '—'}{action.damage_type && ` ${action.damage_type}`}
+        </span>
+        <span className="flex-1 min-w-0 text-slate-500 truncate">{action.notes}</span>
+        <span className="w-20 flex-shrink-0 text-[10px] text-slate-600 uppercase tracking-wide">
+          {CATEGORY_LABEL[action.category]}
+        </span>
+
+        {hasUses && (
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <button
+              onClick={onUse}
+              disabled={action.current_uses === 0}
+              className="w-5 h-5 rounded bg-red-500/10 text-red-300 hover:bg-red-500/20 transition-colors disabled:opacity-30"
+            >
+              −
+            </button>
+            <span className="w-8 text-center text-slate-300">{action.current_uses}/{action.max_uses}</span>
+            <button
+              onClick={onRestore}
+              disabled={action.current_uses === action.max_uses}
+              className="w-5 h-5 rounded bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 transition-colors disabled:opacity-30"
+            >
+              +
+            </button>
+          </div>
+        )}
+
+        <button onClick={onEdit} title="Edit" className="text-slate-600 hover:text-slate-300 transition-colors flex-shrink-0">
+          <Pencil size={12} />
+        </button>
+        <button onClick={onDelete} title="Delete" className="text-slate-600 hover:text-red-400 transition-colors flex-shrink-0">
+          <Trash2 size={12} />
+        </button>
       </div>
-      <span className="w-20 flex-shrink-0 text-slate-400 truncate">{action.range || '—'}</span>
-      <span className="w-12 flex-shrink-0 text-amber-300 font-medium">{formatHitDc(action)}</span>
-      <span className="w-28 flex-shrink-0 text-slate-300 truncate">
-        {action.damage || '—'}{action.damage_type && ` ${action.damage_type}`}
-      </span>
-      <span className="flex-1 min-w-0 text-slate-500 truncate">{action.notes}</span>
-      <span className="w-20 flex-shrink-0 text-[10px] text-slate-600 uppercase tracking-wide">
-        {CATEGORY_LABEL[action.category]}
-      </span>
 
-      {hasUses && (
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <button
-            onClick={onUse}
-            disabled={action.current_uses === 0}
-            className="w-5 h-5 rounded bg-red-500/10 text-red-300 hover:bg-red-500/20 transition-colors disabled:opacity-30"
-          >
-            −
-          </button>
-          <span className="w-8 text-center text-slate-300">{action.current_uses}/{action.max_uses}</span>
-          <button
-            onClick={onRestore}
-            disabled={action.current_uses === action.max_uses}
-            className="w-5 h-5 rounded bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 transition-colors disabled:opacity-30"
-          >
-            +
-          </button>
-        </div>
+      {showCard && (
+        <DetailCard
+          onClose={() => setShowCard(false)}
+          title={action.name}
+          categoryLabel={[CATEGORY_LABEL[action.category], action.weapon_type].filter(Boolean).join(' · ')}
+          stats={[
+            { label: 'Range', value: action.range },
+            { label: action.attack_kind === 'save_dc' ? 'Save DC' : 'To Hit', value: formatHitDc(action) },
+            { label: 'Damage', value: [action.damage, action.damage_type].filter(Boolean).join(' ') },
+          ]}
+          notes={action.notes}
+          description={action.description}
+          usesLabel={
+            hasUses
+              ? `${action.current_uses}/${action.max_uses} uses — recharges on ${
+                  action.recharge === 'custom' ? action.recharge_label || 'Custom' : RECHARGE_LABEL[action.recharge]
+                }`
+              : undefined
+          }
+        />
       )}
-
-      <button onClick={onEdit} className="text-slate-600 hover:text-slate-300 transition-colors flex-shrink-0">
-        <Pencil size={12} />
-      </button>
-      <button onClick={onDelete} className="text-slate-600 hover:text-red-400 transition-colors flex-shrink-0">
-        <Trash2 size={12} />
-      </button>
     </div>
   )
 }

@@ -68,19 +68,77 @@
   }
 }
 
+/* ── UI motion ───────────────────────────────────────────────────────────
+   Shared, reused-everywhere animations rather than bespoke transitions per
+   component — modals, tab switches, and popovers all read as one
+   consistent, deliberate system instead of some things animating and
+   others popping in instantly. Mirrors the DM app's set 1:1. */
+
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes panel-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes popover-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes toast-in {
+  0%   { opacity: 0; transform: translateY(4px) scale(0.95); }
+  15%  { opacity: 1; transform: translateY(0) scale(1); }
+  85%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.animate-fade-in    { animation: fade-in 200ms ease-out both; }
+.animate-fade-in-up  { animation: fade-in-up 220ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-popover     { animation: popover-in 160ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-toast        { animation: toast-in 2.4s ease-out forwards; }
+
 @layer components {
   .btn-primary {
-    @apply bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold px-4 py-2 rounded-lg
-           transition-colors duration-150 text-sm;
+    @apply bg-amber-500 hover:bg-amber-400 active:scale-[0.97] text-slate-900 font-semibold px-4 py-2 rounded-lg
+           transition-[background-color,transform] duration-150 text-sm;
   }
   .btn-ghost {
-    @apply bg-transparent hover:bg-white/5 text-slate-300 hover:text-white px-4 py-2 rounded-lg
-           transition-colors duration-150 text-sm border border-transparent hover:border-white/10;
+    @apply bg-transparent hover:bg-white/5 active:scale-[0.97] text-slate-300 hover:text-white px-4 py-2 rounded-lg
+           transition-[background-color,color,border-color,transform] duration-150 text-sm border border-transparent hover:border-white/10;
   }
 
   .input {
     @apply bg-surface-overlay border border-border rounded-lg px-3 py-2 text-sm text-slate-100
            placeholder:text-slate-500 focus:outline-none focus:border-amber-500/60
            focus:ring-1 focus:ring-amber-500/30 transition-colors w-full;
+  }
+
+  .modal-backdrop {
+    @apply fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4;
+    animation: backdrop-in 160ms ease-out both;
+  }
+  .modal {
+    @apply bg-surface-raised border border-border rounded-xl shadow-2xl w-full;
+    animation: panel-in 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  /* A clickable row (spell/action/ability/inventory list item) — press
+     feedback only, no lift, since rows sit flush against their neighbors. */
+  .row-interactive {
+    @apply transition-[background-color,transform] duration-150 active:scale-[0.99];
   }
 }

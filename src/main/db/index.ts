@@ -84,6 +84,9 @@ function createSchema(): void {
       concentration INTEGER NOT NULL DEFAULT 0,
       prepared      INTEGER NOT NULL DEFAULT 0,
       description   TEXT NOT NULL DEFAULT '',
+      damage        TEXT NOT NULL DEFAULT '',
+      damage_type   TEXT NOT NULL DEFAULT '',
+      attack_kind   TEXT NOT NULL DEFAULT 'attack_roll',
       sort_order    INTEGER NOT NULL DEFAULT 0
     );
 
@@ -131,7 +134,12 @@ function createSchema(): void {
       current_uses   INTEGER,
       recharge       TEXT NOT NULL DEFAULT 'long_rest',
       recharge_label TEXT NOT NULL DEFAULT '',
-      sort_order     INTEGER NOT NULL DEFAULT 0
+      sort_order     INTEGER NOT NULL DEFAULT 0,
+      -- Set only on an action auto-generated from a spell/weapon's damage
+      -- field (see syncSourceAction in ipc/character.ts) — NULL for every
+      -- action the player created by hand, which this sync never touches.
+      source_type    TEXT,
+      source_id      TEXT
     );
 
     -- Carried gear. Weight capacity (STR score × 15) and total weight
@@ -145,7 +153,10 @@ function createSchema(): void {
       cost        REAL NOT NULL DEFAULT 0,
       notes       TEXT NOT NULL DEFAULT '',
       equipped    INTEGER NOT NULL DEFAULT 0,
-      sort_order  INTEGER NOT NULL DEFAULT 0
+      sort_order  INTEGER NOT NULL DEFAULT 0,
+      damage      TEXT NOT NULL DEFAULT '',
+      damage_type TEXT NOT NULL DEFAULT '',
+      range       TEXT NOT NULL DEFAULT ''
     );
 
     CREATE TABLE IF NOT EXISTS schema_version (
@@ -322,5 +333,31 @@ function runMigrations(): void {
       d.exec('ALTER TABLE character ADD COLUMN exhaustion_level INTEGER NOT NULL DEFAULT 0')
     }
     d.prepare('UPDATE schema_version SET version = 8').run()
+  }
+
+  if (v < 9) {
+    // Damage on spells and weapon-like inventory items, which now
+    // auto-generate/update a linked row in `actions` (see syncSourceAction
+    // in ipc/character.ts) instead of the player retyping the same attack
+    // into the Actions tab by hand. New installs already have all of this
+    // via createSchema() above.
+    const spellCols = d.prepare('PRAGMA table_info(spells)').all() as { name: string }[]
+    const spellNames = new Set(spellCols.map((c) => c.name))
+    if (!spellNames.has('damage')) d.exec("ALTER TABLE spells ADD COLUMN damage TEXT NOT NULL DEFAULT ''")
+    if (!spellNames.has('damage_type')) d.exec("ALTER TABLE spells ADD COLUMN damage_type TEXT NOT NULL DEFAULT ''")
+    if (!spellNames.has('attack_kind')) d.exec("ALTER TABLE spells ADD COLUMN attack_kind TEXT NOT NULL DEFAULT 'attack_roll'")
+
+    const invCols = d.prepare('PRAGMA table_info(inventory)').all() as { name: string }[]
+    const invNames = new Set(invCols.map((c) => c.name))
+    if (!invNames.has('damage')) d.exec("ALTER TABLE inventory ADD COLUMN damage TEXT NOT NULL DEFAULT ''")
+    if (!invNames.has('damage_type')) d.exec("ALTER TABLE inventory ADD COLUMN damage_type TEXT NOT NULL DEFAULT ''")
+    if (!invNames.has('range')) d.exec("ALTER TABLE inventory ADD COLUMN range TEXT NOT NULL DEFAULT ''")
+
+    const actionCols = d.prepare('PRAGMA table_info(actions)').all() as { name: string }[]
+    const actionNames = new Set(actionCols.map((c) => c.name))
+    if (!actionNames.has('source_type')) d.exec('ALTER TABLE actions ADD COLUMN source_type TEXT')
+    if (!actionNames.has('source_id')) d.exec('ALTER TABLE actions ADD COLUMN source_id TEXT')
+
+    d.prepare('UPDATE schema_version SET version = 9').run()
   }
 }

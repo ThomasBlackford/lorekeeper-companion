@@ -47,7 +47,6 @@ export function ActionsSection({ character, onUpdate }: Props) {
   }
 
   const filtered = character.actions.filter((a) => filter === 'all' || a.category === filter)
-  const withDescriptions = filtered.filter((a) => a.description.trim())
 
   return (
     <div>
@@ -109,18 +108,6 @@ export function ActionsSection({ character, onUpdate }: Props) {
           )}
         </div>
       </div>
-
-      {withDescriptions.length > 0 && (
-        <div className="mt-4 pt-4 border-t border-border space-y-3">
-          <h3 className="text-[11px] uppercase tracking-widest text-slate-600 font-medium">In-Depth Effects</h3>
-          {withDescriptions.map((a) => (
-            <div key={a.id}>
-              <p className="text-xs font-semibold text-slate-300">{a.name}</p>
-              <p className="text-xs text-slate-500 leading-relaxed mt-0.5 whitespace-pre-wrap">{a.description}</p>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 }

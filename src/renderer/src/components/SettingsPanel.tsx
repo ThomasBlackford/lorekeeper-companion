@@ -26,12 +26,9 @@ export function SettingsPanel({ onClose }: Props) {
   const { style, color, layout, setStyle, setColor, setLayout } = useSettings()
 
   return (
-    <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center"
-      onClick={onClose}
-    >
+    <div className="modal-backdrop" onClick={onClose}>
       <div
-        className="bg-surface-raised border border-border rounded-xl shadow-2xl w-full max-w-sm p-5"
+        className="modal max-w-sm p-5"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">

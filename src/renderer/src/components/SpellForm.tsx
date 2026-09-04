@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Check, X, Trash2 } from 'lucide-react'
-import type { Spell } from '../types'
+import type { AttackKind, Spell } from '../types'
 
 interface Props {
   initial?: Spell
@@ -14,6 +14,12 @@ const LEVEL_OPTIONS = [
   ...Array.from({ length: 9 }, (_, i) => ({ value: i + 1, label: `Level ${i + 1}` }))
 ]
 
+const ATTACK_KIND_OPTIONS: { value: AttackKind; label: string }[] = [
+  { value: 'attack_roll', label: 'Spell attack roll' },
+  { value: 'save_dc', label: 'Target saves' },
+  { value: 'none', label: 'No roll' }
+]
+
 export function SpellForm({ initial, onSave, onCancel, onDelete }: Props) {
   const [name, setName] = useState(initial?.name ?? '')
   const [level, setLevel] = useState(initial?.level ?? 0)
@@ -25,6 +31,9 @@ export function SpellForm({ initial, onSave, onCancel, onDelete }: Props) {
   const [ritual, setRitual] = useState(initial?.ritual ?? false)
   const [concentration, setConcentration] = useState(initial?.concentration ?? false)
   const [prepared, setPrepared] = useState(initial?.prepared ?? false)
+  const [damage, setDamage] = useState(initial?.damage ?? '')
+  const [damageType, setDamageType] = useState(initial?.damage_type ?? '')
+  const [attackKind, setAttackKind] = useState<AttackKind>(initial?.attack_kind ?? 'attack_roll')
 
   function submit() {
     if (!name.trim()) return
@@ -38,7 +47,10 @@ export function SpellForm({ initial, onSave, onCancel, onDelete }: Props) {
       description,
       ritual,
       concentration,
-      prepared
+      prepared,
+      damage,
+      damage_type: damageType,
+      attack_kind: attackKind
     })
   }
 
@@ -78,6 +90,21 @@ export function SpellForm({ initial, onSave, onCancel, onDelete }: Props) {
         value={description}
         onChange={(e) => setDescription(e.target.value)}
       />
+
+      <div>
+        <div className="grid grid-cols-3 gap-2">
+          <input className="input text-xs" placeholder="Damage (e.g. 3d6)" value={damage} onChange={(e) => setDamage(e.target.value)} />
+          <input className="input text-xs" placeholder="Damage type" value={damageType} onChange={(e) => setDamageType(e.target.value)} />
+          <select className="input text-xs" value={attackKind} onChange={(e) => setAttackKind(e.target.value as AttackKind)}>
+            {ATTACK_KIND_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+        {damage.trim() && (
+          <p className="text-[10px] text-amber-500/60 mt-1">Adds/updates a matching entry in the Actions tab automatically.</p>
+        )}
+      </div>
 
       <div className="flex items-center gap-4 text-xs text-slate-400">
         <label className="flex items-center gap-1.5 cursor-pointer">

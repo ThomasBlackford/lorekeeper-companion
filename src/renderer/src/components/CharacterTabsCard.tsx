@@ -7,6 +7,7 @@ import { ResourceTracker } from './ResourceTracker'
 import { AbilitiesSection } from './AbilitiesSection'
 import { BackgroundSection } from './BackgroundSection'
 import { SkillsSection } from './SkillsSection'
+import { PlayModeSection } from './PlayModeSection'
 
 interface Props {
   character: Character
@@ -14,6 +15,7 @@ interface Props {
 }
 
 const TABS = [
+  { id: 'play', label: 'Play' },
   { id: 'actions', label: 'Actions' },
   { id: 'skills', label: 'Skills' },
   { id: 'spells', label: 'Spells' },
@@ -26,7 +28,10 @@ const TABS = [
 type TabId = (typeof TABS)[number]['id']
 
 export function CharacterTabsCard({ character, onUpdate }: Props) {
-  const [tab, setTab] = useState<TabId>('actions')
+  // "Play" — a read-only everything-at-once reference — is what the sheet
+  // opens on, since that's what actually gets looked at during a session;
+  // the editable tabs are one click away whenever something changes.
+  const [tab, setTab] = useState<TabId>('play')
 
   async function handleResourcesChange(resources: Character['resources']) {
     const c = await window.api.character.updateResources(resources)
@@ -45,7 +50,7 @@ export function CharacterTabsCard({ character, onUpdate }: Props) {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`px-3 py-2.5 text-xs font-medium whitespace-nowrap transition-colors border-b-2 -mb-px ${
+            className={`px-3 py-2.5 text-xs font-medium whitespace-nowrap transition-[color,border-color] duration-200 border-b-2 -mb-px ${
               tab === t.id
                 ? 'text-amber-300 border-amber-400'
                 : 'text-slate-500 hover:text-slate-300 border-transparent'
@@ -56,7 +61,10 @@ export function CharacterTabsCard({ character, onUpdate }: Props) {
         ))}
       </div>
 
-      <div className="p-4">
+      {/* Keying on `tab` replays the fade-in on every switch — a cheap way
+         to make tab content feel like it arrived rather than just swapped. */}
+      <div key={tab} className="p-4 animate-fade-in">
+        {tab === 'play' && <PlayModeSection character={character} />}
         {tab === 'actions' && <ActionsSection character={character} onUpdate={onUpdate} />}
         {tab === 'skills' && <SkillsSection character={character} onUpdate={onUpdate} />}
         {tab === 'spells' && <SpellsSection character={character} onUpdate={onUpdate} />}

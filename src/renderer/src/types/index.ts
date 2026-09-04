@@ -20,6 +20,9 @@ export interface Spell {
   concentration: boolean
   prepared: boolean
   description: string
+  damage: string // e.g. "3d6" — non-empty auto-generates a linked Actions entry
+  damage_type: string
+  attack_kind: AttackKind // whether that damage rolls to hit or targets a save
   sort_order: number
 }
 
@@ -86,6 +89,11 @@ export interface CombatAction {
   recharge: RechargeType
   recharge_label: string
   sort_order: number
+  // Set only when this action was auto-generated from a spell/weapon's
+  // damage field — null for anything the player created by hand, which the
+  // sync in ipc/character.ts never touches.
+  source_type: 'spell' | 'item' | null
+  source_id: string | null
 }
 
 export type DefenseType = 'resistance' | 'immunity' | 'vulnerability'
@@ -115,6 +123,9 @@ export interface InventoryItem {
   notes: string
   equipped: boolean
   sort_order: number
+  damage: string // e.g. "1d8" — non-empty auto-generates a linked Actions entry
+  damage_type: string
+  range: string // e.g. "Melee" or "80/320 ft" — carried into the generated action
 }
 
 // Freeform roleplay/identity info — one editable blob rather than a table,

@@ -24,6 +24,9 @@ export function InventoryItemForm({ initial, onSave, onCancel, onDelete }: Props
   const [cost, setCost] = useState(initial?.cost != null ? String(initial.cost) : '')
   const [notes, setNotes] = useState(initial?.notes ?? '')
   const [equipped, setEquipped] = useState(initial?.equipped ?? false)
+  const [damage, setDamage] = useState(initial?.damage ?? '')
+  const [damageType, setDamageType] = useState(initial?.damage_type ?? '')
+  const [range, setRange] = useState(initial?.range ?? '')
 
   function submit() {
     if (!name.trim()) return
@@ -34,7 +37,10 @@ export function InventoryItemForm({ initial, onSave, onCancel, onDelete }: Props
       quantity: Math.max(1, parseInt(quantity) || 1),
       cost: parseFloat(cost) || 0,
       notes,
-      equipped
+      equipped,
+      damage,
+      damage_type: damageType,
+      range
     })
   }
 
@@ -80,6 +86,18 @@ export function InventoryItemForm({ initial, onSave, onCancel, onDelete }: Props
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
       />
+
+      <div>
+        <label className="text-xs text-slate-500 block mb-1">Weapon damage (leave blank for non-weapons)</label>
+        <div className="grid grid-cols-3 gap-2">
+          <input className="input text-xs" placeholder="e.g. 1d8" value={damage} onChange={(e) => setDamage(e.target.value)} />
+          <input className="input text-xs" placeholder="Type (e.g. Slashing)" value={damageType} onChange={(e) => setDamageType(e.target.value)} />
+          <input className="input text-xs" placeholder="Range (e.g. Melee)" value={range} onChange={(e) => setRange(e.target.value)} />
+        </div>
+        {damage.trim() && (
+          <p className="text-[10px] text-amber-500/60 mt-1">Adds/updates a matching entry in the Actions tab automatically.</p>
+        )}
+      </div>
 
       <label className="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer">
         <input type="checkbox" checked={equipped} onChange={(e) => setEquipped(e.target.checked)} /> Equipped / worn

@@ -62,6 +62,9 @@ interface SpellRow {
   concentration: number
   prepared: number
   description: string
+  damage: string
+  damage_type: string
+  attack_kind: string
   sort_order: number
 }
 interface SlotRow { level: number; max: number; current: number }
@@ -93,6 +96,8 @@ interface ActionRow {
   recharge: string
   recharge_label: string
   sort_order: number
+  source_type: string | null
+  source_id: string | null
 }
 interface InventoryRow {
   id: string
@@ -104,6 +109,9 @@ interface InventoryRow {
   notes: string
   equipped: number
   sort_order: number
+  damage: string
+  damage_type: string
+  range: string
 }
 
 function buildCharacter(db: ReturnType<typeof getDb>) {
@@ -201,6 +209,101 @@ function buildCharacterAndSync(db: ReturnType<typeof getDb>) {
     conditions: character.conditions
   })
   return character
+}
+
+// Spell attack bonus / save DC, computed the same way SpellcastingStats.tsx
+// does in the renderer — duplicated here (rather than shared) since it's
+// three lines of arithmetic and pulling renderer code into the main
+// process isn't worth it for that.
+function computeSpellStats(db: ReturnType<typeof getDb>): { attackBonus: number; saveDc: number } | null {
+  const char = db.prepare("SELECT * FROM character WHERE id='local'").get() as CharacterRow
+  if (!char.spellcasting_ability) return null
+  const abilityScore = char[char.spellcasting_ability as keyof CharacterRow] as number
+  const abilityMod = Math.floor((abilityScore - 10) / 2)
+  const pb = char.proficiency_bonus ?? 0
+  return { attackBonus: abilityMod + pb, saveDc: 8 + abilityMod + pb }
+}
+
+// Keeps a spell or weapon's damage in sync with a linked row in `actions`,
+// so the player never has to retype the same attack a second time — this
+// is what the damage field on Spells/Inventory is for. Only ever touches
+// the one action whose source_type/source_id matches; every hand-created
+// action has both NULL and is invisible to this function.
+function syncSourceAction(
+  db: ReturnType<typeof getDb>,
+  sourceType: 'spell' | 'item',
+  sourceId: string,
+  data: { name: string; damage: string; damageType: string; range?: string; attackKind?: string; hitDcValue?: number | null }
+): void {
+  const existing = db
+    .prepare('SELECT * FROM actions WHERE source_type=? AND source_id=?')
+    .get(sourceType, sourceId) as ActionRow | undefined
+
+  if (!data.damage.trim()) {
+    // Damage was cleared — the generated action no longer represents
+    // anything, so remove it rather than leave a stale "0 damage" entry.
+    if (existing) db.prepare('DELETE FROM actions WHERE id=?').run(existing.id)
+    return
+  }
+
+  if (existing) {
+    // Name/damage/range always mirror the source. attack_kind/hit_dc_value
+    // are only overwritten when the caller passes them (spells recompute
+    // these every save) — for weapons they're left alone so a to-hit bonus
+    // the player typed into the generated action isn't wiped out by a
+    // later edit to the item's weight or notes.
+    db.prepare('UPDATE actions SET name=?, damage=?, damage_type=?, range=? WHERE id=?').run(
+      data.name, data.damage, data.damageType, data.range ?? existing.range, existing.id
+    )
+    if (data.attackKind) {
+      db.prepare('UPDATE actions SET attack_kind=?, hit_dc_value=? WHERE id=?').run(
+        data.attackKind, data.hitDcValue ?? null, existing.id
+      )
+    }
+  } else {
+    const count = (db.prepare('SELECT COUNT(*) as c FROM actions').get() as { c: number }).c
+    db.prepare(
+      `INSERT INTO actions (id, name, category, weapon_type, range, attack_kind, hit_dc_value, damage, damage_type, notes, description, max_uses, current_uses, recharge, recharge_label, sort_order, source_type, source_id)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+    ).run(
+      uuidv4(),
+      data.name,
+      'attack',
+      sourceType === 'spell' ? 'Spell' : 'Weapon',
+      data.range ?? '',
+      data.attackKind ?? 'attack_roll',
+      data.hitDcValue ?? null,
+      data.damage,
+      data.damageType,
+      '',
+      '',
+      null,
+      null,
+      'unlimited',
+      '',
+      count,
+      sourceType,
+      sourceId
+    )
+  }
+}
+
+// Thin wrapper over syncSourceAction for spells specifically — computes the
+// current spell attack bonus / save DC so the generated action's hit/DC
+// number stays correct as proficiency bonus and ability scores change,
+// rather than freezing whatever it was the moment the spell was first typed in.
+function syncSpellAction(
+  db: ReturnType<typeof getDb>,
+  spellId: string,
+  name: string,
+  damage: string,
+  damageType: string,
+  attackKind: string
+): void {
+  const stats = computeSpellStats(db)
+  const hitDcValue =
+    !stats || attackKind === 'none' ? null : attackKind === 'save_dc' ? stats.saveDc : stats.attackBonus
+  syncSourceAction(db, 'spell', spellId, { name, damage, damageType, attackKind, hitDcValue })
 }
 
 export function registerCharacterHandlers(): void {
@@ -351,12 +454,16 @@ export function registerCharacterHandlers(): void {
 
   ipcMain.handle('spells:add', (_e, data: Record<string, unknown>) => {
     const db = getDb()
+    const id = uuidv4()
     const count = (db.prepare('SELECT COUNT(*) as c FROM spells').get() as { c: number }).c
+    const damage = (data.damage as string) ?? ''
+    const damageType = (data.damage_type as string) ?? ''
+    const attackKind = (data.attack_kind as string) ?? 'attack_roll'
     db.prepare(
-      `INSERT INTO spells (id, name, level, school, casting_time, range, duration, ritual, concentration, prepared, description, sort_order)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
+      `INSERT INTO spells (id, name, level, school, casting_time, range, duration, ritual, concentration, prepared, description, damage, damage_type, attack_kind, sort_order)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     ).run(
-      uuidv4(),
+      id,
       data.name,
       data.level ?? 0,
       data.school ?? '',
@@ -367,8 +474,12 @@ export function registerCharacterHandlers(): void {
       data.concentration ? 1 : 0,
       data.prepared ? 1 : 0,
       data.description ?? '',
+      damage,
+      damageType,
+      attackKind,
       count
     )
+    syncSpellAction(db, id, data.name as string, damage, damageType, attackKind)
     return buildCharacterAndSync(db)
   })
 
@@ -386,10 +497,13 @@ export function registerCharacterHandlers(): void {
       ritual: 'ritual' in changes ? (changes.ritual ? 1 : 0) : existing.ritual,
       concentration: 'concentration' in changes ? (changes.concentration ? 1 : 0) : existing.concentration,
       prepared: 'prepared' in changes ? (changes.prepared ? 1 : 0) : existing.prepared,
-      description: changes.description ?? existing.description
+      description: changes.description ?? existing.description,
+      damage: 'damage' in changes ? (changes.damage as string) : existing.damage,
+      damage_type: 'damage_type' in changes ? (changes.damage_type as string) : existing.damage_type,
+      attack_kind: 'attack_kind' in changes ? (changes.attack_kind as string) : existing.attack_kind
     }
     db.prepare(
-      `UPDATE spells SET name=?, level=?, school=?, casting_time=?, range=?, duration=?, ritual=?, concentration=?, prepared=?, description=? WHERE id=?`
+      `UPDATE spells SET name=?, level=?, school=?, casting_time=?, range=?, duration=?, ritual=?, concentration=?, prepared=?, description=?, damage=?, damage_type=?, attack_kind=? WHERE id=?`
     ).run(
       merged.name,
       merged.level,
@@ -401,14 +515,19 @@ export function registerCharacterHandlers(): void {
       merged.concentration,
       merged.prepared,
       merged.description,
+      merged.damage,
+      merged.damage_type,
+      merged.attack_kind,
       id
     )
+    syncSpellAction(db, id, merged.name as string, merged.damage, merged.damage_type, merged.attack_kind)
     return buildCharacterAndSync(db)
   })
 
   ipcMain.handle('spells:remove', (_e, id: string) => {
     const db = getDb()
     db.prepare('DELETE FROM spells WHERE id=?').run(id)
+    db.prepare("DELETE FROM actions WHERE source_type='spell' AND source_id=?").run(id)
     return buildCharacterAndSync(db)
   })
 
@@ -594,12 +713,16 @@ export function registerCharacterHandlers(): void {
 
   ipcMain.handle('inventory:add', (_e, data: Record<string, unknown>) => {
     const db = getDb()
+    const id = uuidv4()
     const count = (db.prepare('SELECT COUNT(*) as c FROM inventory').get() as { c: number }).c
+    const damage = (data.damage as string) ?? ''
+    const damageType = (data.damage_type as string) ?? ''
+    const range = (data.range as string) ?? ''
     db.prepare(
-      `INSERT INTO inventory (id, name, category, weight, quantity, cost, notes, equipped, sort_order)
-       VALUES (?,?,?,?,?,?,?,?,?)`
+      `INSERT INTO inventory (id, name, category, weight, quantity, cost, notes, equipped, sort_order, damage, damage_type, range)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
     ).run(
-      uuidv4(),
+      id,
       data.name,
       data.category ?? 'equipment',
       Number(data.weight) || 0,
@@ -607,8 +730,12 @@ export function registerCharacterHandlers(): void {
       Number(data.cost) || 0,
       data.notes ?? '',
       data.equipped ? 1 : 0,
-      count
+      count,
+      damage,
+      damageType,
+      range
     )
+    syncSourceAction(db, 'item', id, { name: data.name as string, damage, damageType, range })
     return buildCharacterAndSync(db)
   })
 
@@ -623,10 +750,13 @@ export function registerCharacterHandlers(): void {
       quantity: 'quantity' in changes ? Number(changes.quantity) || 0 : existing.quantity,
       cost: 'cost' in changes ? Number(changes.cost) || 0 : existing.cost,
       notes: changes.notes ?? existing.notes,
-      equipped: 'equipped' in changes ? (changes.equipped ? 1 : 0) : existing.equipped
+      equipped: 'equipped' in changes ? (changes.equipped ? 1 : 0) : existing.equipped,
+      damage: 'damage' in changes ? (changes.damage as string) : existing.damage,
+      damage_type: 'damage_type' in changes ? (changes.damage_type as string) : existing.damage_type,
+      range: 'range' in changes ? (changes.range as string) : existing.range
     }
     db.prepare(
-      `UPDATE inventory SET name=?, category=?, weight=?, quantity=?, cost=?, notes=?, equipped=? WHERE id=?`
+      `UPDATE inventory SET name=?, category=?, weight=?, quantity=?, cost=?, notes=?, equipped=?, damage=?, damage_type=?, range=? WHERE id=?`
     ).run(
       merged.name,
       merged.category,
@@ -635,14 +765,24 @@ export function registerCharacterHandlers(): void {
       merged.cost,
       merged.notes,
       merged.equipped,
+      merged.damage,
+      merged.damage_type,
+      merged.range,
       id
     )
+    syncSourceAction(db, 'item', id, {
+      name: merged.name as string,
+      damage: merged.damage,
+      damageType: merged.damage_type,
+      range: merged.range
+    })
     return buildCharacterAndSync(db)
   })
 
   ipcMain.handle('inventory:remove', (_e, id: string) => {
     const db = getDb()
     db.prepare('DELETE FROM inventory WHERE id=?').run(id)
+    db.prepare("DELETE FROM actions WHERE source_type='item' AND source_id=?").run(id)
     return buildCharacterAndSync(db)
   })
 
