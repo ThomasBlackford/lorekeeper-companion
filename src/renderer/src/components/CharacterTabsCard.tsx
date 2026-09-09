@@ -50,7 +50,7 @@ export function CharacterTabsCard({ character, onUpdate }: Props) {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`px-3 py-2.5 text-xs font-medium whitespace-nowrap transition-[color,border-color] duration-200 border-b-2 -mb-px ${
+            className={`px-3 py-2.5 text-xs font-medium whitespace-nowrap transition-[color,border-color] duration-300 border-b-2 -mb-px ${
               tab === t.id
                 ? 'text-amber-300 border-amber-400'
                 : 'text-slate-500 hover:text-slate-300 border-transparent'

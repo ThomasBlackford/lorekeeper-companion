@@ -43,6 +43,14 @@ export default {
       borderRadius: {
         xl: 'var(--radius-card, 0.75rem)',
         lg: 'var(--radius-input, 0.5rem)'
+      },
+      // Tailwind's `transition-colors`/`transition-all`/etc. default to
+      // 150ms with no `duration-*` suffix — nearly every hover/focus state
+      // in the app uses one of those bare. Overriding the DEFAULT here (not
+      // adding a new scale step) makes all of them 300ms app-wide from this
+      // one line, instead of hunting down every occurrence individually.
+      transitionDuration: {
+        DEFAULT: '300ms'
       }
     }
   },
