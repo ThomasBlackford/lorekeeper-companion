@@ -6,6 +6,7 @@ import { setMainWin, getMainWin } from './mainWindow'
 import { registerCharacterHandlers } from './ipc/character'
 import { registerSyncHandlers } from './ipc/sync'
 import { registerUpdaterHandlers } from './ipc/updater'
+import { registerBackupHandlers, runAutoBackup } from './ipc/backup'
 import { connect, disconnect } from './sync'
 import { initAutoUpdater } from './updater'
 
@@ -18,7 +19,7 @@ function createWindow(): void {
     show: false,
     autoHideMenuBar: true,
     titleBarStyle: 'hiddenInset',
-    backgroundColor: '#0d1117',
+    backgroundColor: '#040102',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -82,6 +83,8 @@ if (!gotLock) {
     registerCharacterHandlers()
     registerSyncHandlers()
     registerUpdaterHandlers()
+    registerBackupHandlers()
+    void runAutoBackup()
 
     createWindow()
 
@@ -92,10 +95,10 @@ if (!gotLock) {
     // Reconnect to whatever DM server was last used, if any — harmless if
     // it's not reachable, just leaves the app in its normal disconnected
     // state until the player connects manually from Settings.
-    const saved = getDb().prepare("SELECT dm_server_address FROM character WHERE id='local'").get() as
-      | { dm_server_address: string }
+    const saved = getDb().prepare("SELECT dm_server_address, dm_join_code FROM character WHERE id='local'").get() as
+      | { dm_server_address: string; dm_join_code: string }
       | undefined
-    if (saved?.dm_server_address) connect(saved.dm_server_address)
+    if (saved?.dm_server_address) connect(saved.dm_server_address, saved.dm_join_code ?? '')
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()

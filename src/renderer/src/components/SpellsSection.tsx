@@ -1,10 +1,14 @@
 import { useState } from 'react'
-import { Plus, Search } from 'lucide-react'
+import { Plus, Search, BookOpen } from 'lucide-react'
 import type { AbilityScoreKey, Character, Spell } from '../types'
 import { SpellcastingStats } from './SpellcastingStats'
 import { SpellSlots } from './SpellSlots'
 import { SpellRow } from './SpellRow'
 import { SpellForm } from './SpellForm'
+import { CastDialog } from './CastDialog'
+import { LibraryModal } from './LibraryModal'
+import { SRD_SPELLS } from '../data/srdSpells'
+import { useConfirm } from '../hooks/useConfirm'
 
 interface Props {
   character: Character
@@ -22,6 +26,9 @@ export function SpellsSection({ character, onUpdate }: Props) {
   const [levelFilter, setLevelFilter] = useState<number | 'all'>('all')
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [casting, setCasting] = useState<Spell | null>(null)
+  const [library, setLibrary] = useState(false)
+  const { ask, dialog } = useConfirm()
 
   async function handleSpellcastingChange(changes: { spellcasting_ability: AbilityScoreKey | null; spellcasting_class: string }) {
     const c = await window.api.character.save(changes)
@@ -56,6 +63,16 @@ export function SpellsSection({ character, onUpdate }: Props) {
     setEditingId(null)
   }
 
+  function requestRemove(x: { id: string; name: string }) {
+    ask({
+      title: `Delete ${x.name}?`,
+      message: "This can't be undone.",
+      confirmLabel: 'Delete',
+      danger: true,
+      onYes: () => handleRemove(x.id)
+    })
+  }
+
   const levelsPresent = Array.from(new Set(character.spells.map((s) => s.level))).sort((a, b) => a - b)
 
   const filtered = character.spells.filter((s) => {
@@ -71,7 +88,13 @@ export function SpellsSection({ character, onUpdate }: Props) {
 
   return (
     <div>
-      <div className="flex justify-end mb-3">
+      <div className="flex justify-end items-center gap-4 mb-3">
+        <button
+          onClick={() => setLibrary(true)}
+          className="flex items-center gap-1 text-xs text-slate-400 hover:text-white transition-colors"
+        >
+          <BookOpen size={13} /> From library
+        </button>
         <button
           onClick={() => setAdding((v) => !v)}
           className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 transition-colors"
@@ -142,7 +165,7 @@ export function SpellsSection({ character, onUpdate }: Props) {
                       initial={s}
                       onSave={(changes) => handleUpdate(s.id, changes).then(() => setEditingId(null))}
                       onCancel={() => setEditingId(null)}
-                      onDelete={() => handleRemove(s.id)}
+                      onDelete={() => requestRemove(s)}
                     />
                   ) : (
                     <SpellRow
@@ -152,6 +175,7 @@ export function SpellsSection({ character, onUpdate }: Props) {
                       onTogglePrepared={() => handleUpdate(s.id, { prepared: !s.prepared })}
                       onToggleConcentration={() => handleToggleConcentration(s.name)}
                       onEdit={() => setEditingId(s.id)}
+                      onCast={() => setCasting(s)}
                     />
                   )
                 )}
@@ -160,6 +184,29 @@ export function SpellsSection({ character, onUpdate }: Props) {
           ))
         )}
       </div>
+      {dialog}
+      {library && (
+        <LibraryModal
+          title="Spell library"
+          items={SRD_SPELLS.map((s) => ({
+            key: s.name,
+            name: s.name,
+            group: s.level === 0 ? 'Cantrips' : `Level ${s.level}`,
+            meta: [s.level === 0 ? 'Cantrip' : `Level ${s.level}`, s.school, s.casting_time, s.range, s.damage ? `${s.damage} ${s.damage_type ?? ''}`.trim() : null]
+              .filter(Boolean)
+              .join(' · ')
+          }))}
+          groups={['Cantrips', 'Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5']}
+          alreadyHave={new Set(character.spells.map((s) => s.name.toLowerCase()))}
+          onClose={() => setLibrary(false)}
+          onPick={async (key) => {
+            const s = SRD_SPELLS.find((x) => x.name === key)
+            if (!s) return
+            onUpdate(await window.api.spells.add({ ...s, prepared: s.level === 0, attack_kind: s.attack_kind ?? 'none' }))
+          }}
+        />
+      )}
+      {casting && <CastDialog spell={casting} character={character} onClose={() => setCasting(null)} onUpdate={onUpdate} />}
     </div>
   )
 }

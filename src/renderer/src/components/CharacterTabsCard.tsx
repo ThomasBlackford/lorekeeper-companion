@@ -45,12 +45,12 @@ export function CharacterTabsCard({ character, onUpdate }: Props) {
 
   return (
     <div className="bg-surface-raised border border-border rounded-xl overflow-hidden">
-      <div className="flex items-center gap-1 px-2 pt-1 border-b border-border overflow-x-auto">
+      <div className="flex items-center gap-1 px-2 pt-1 border-b border-border overflow-x-auto no-scrollbar">
         {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`px-3 py-2.5 text-xs font-medium whitespace-nowrap transition-[color,border-color] duration-300 border-b-2 -mb-px ${
+            className={`px-3 py-2.5 text-xs font-medium whitespace-nowrap transition-[color,border-color] duration-500 border-b-2 -mb-px ${
               tab === t.id
                 ? 'text-amber-300 border-amber-400'
                 : 'text-slate-500 hover:text-slate-300 border-transparent'
@@ -64,7 +64,7 @@ export function CharacterTabsCard({ character, onUpdate }: Props) {
       {/* Keying on `tab` replays the fade-in on every switch — a cheap way
          to make tab content feel like it arrived rather than just swapped. */}
       <div key={tab} className="p-4 animate-fade-in">
-        {tab === 'play' && <PlayModeSection character={character} />}
+        {tab === 'play' && <PlayModeSection character={character} onUpdate={onUpdate} onNavigate={(t) => setTab(t)} />}
         {tab === 'actions' && <ActionsSection character={character} onUpdate={onUpdate} />}
         {tab === 'skills' && <SkillsSection character={character} onUpdate={onUpdate} />}
         {tab === 'spells' && <SpellsSection character={character} onUpdate={onUpdate} />}

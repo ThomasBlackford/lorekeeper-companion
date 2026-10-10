@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Info, Pencil, Repeat, Sparkles } from 'lucide-react'
+import { Info, Pencil, Repeat, Sparkles, Wand2 } from 'lucide-react'
 import type { Spell } from '../types'
 import { DetailCard } from './DetailCard'
 
@@ -15,9 +15,10 @@ interface Props {
   onTogglePrepared: () => void
   onToggleConcentration: () => void
   onEdit: () => void
+  onCast: () => void
 }
 
-export function SpellRow({ spell, isConcentrating, onTogglePrepared, onToggleConcentration, onEdit }: Props) {
+export function SpellRow({ spell, isConcentrating, onTogglePrepared, onToggleConcentration, onEdit, onCast }: Props) {
   const hasDamage = spell.damage.trim().length > 0
   const [showCard, setShowCard] = useState(false)
 
@@ -68,6 +69,14 @@ export function SpellRow({ spell, isConcentrating, onTogglePrepared, onToggleCon
         <label className="flex items-center gap-1 text-[11px] text-slate-500 flex-shrink-0 cursor-pointer">
           <input type="checkbox" checked={spell.prepared} onChange={onTogglePrepared} /> Prep
         </label>
+
+        <button
+          onClick={onCast}
+          title="Cast — spends a slot and rolls"
+          className="flex items-center gap-1 px-2 py-1 text-[10px] uppercase tracking-wider border border-purple-400/40 text-purple-200 hover:bg-purple-500/15 transition-colors flex-shrink-0"
+        >
+          <Wand2 size={10} /> Cast
+        </button>
 
         <button onClick={onEdit} title="Edit" className="text-slate-600 hover:text-slate-300 transition-colors flex-shrink-0">
           <Pencil size={12} />

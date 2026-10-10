@@ -16,6 +16,11 @@ export function initDb(userDataPath: string): void {
   runMigrations()
 }
 
+export function closeDb(): void {
+  db?.close()
+  db = null
+}
+
 export function getDb(): Database.Database {
   if (!db) throw new Error('Database not initialized')
   return db
@@ -359,5 +364,23 @@ function runMigrations(): void {
     if (!actionNames.has('source_id')) d.exec('ALTER TABLE actions ADD COLUMN source_id TEXT')
 
     d.prepare('UPDATE schema_version SET version = 9').run()
+  }
+
+  if (v < 10) {
+    // Experience + level-up tracking, the full coin set (the old single
+    // "gold" column stays as gp), a character portrait, and the DM's join
+    // code for the sync connection.
+    const charCols = new Set((d.prepare('PRAGMA table_info(character)').all() as { name: string }[]).map((c) => c.name))
+    const add = (name: string, def: string) => {
+      if (!charCols.has(name)) d.exec(`ALTER TABLE character ADD COLUMN ${name} ${def}`)
+    }
+    add('xp', 'INTEGER NOT NULL DEFAULT 0')
+    add('cp', 'INTEGER NOT NULL DEFAULT 0')
+    add('sp', 'INTEGER NOT NULL DEFAULT 0')
+    add('ep', 'INTEGER NOT NULL DEFAULT 0')
+    add('pp', 'INTEGER NOT NULL DEFAULT 0')
+    add('portrait_path', "TEXT NOT NULL DEFAULT ''")
+    add('dm_join_code', "TEXT NOT NULL DEFAULT ''")
+    d.prepare('UPDATE schema_version SET version = 10').run()
   }
 }

@@ -15,7 +15,7 @@ export function UpdateBanner() {
   if (!ready) return null
 
   return (
-    <div className="fixed top-0 inset-x-0 z-50 flex items-center justify-center gap-3 bg-amber-500/90 text-slate-900 text-xs font-medium py-1.5">
+    <div className="fixed top-0 inset-x-0 z-50 flex items-center justify-center gap-3 bg-amber-500 text-white text-xs font-medium py-1.5">
       <RefreshCw size={13} />
       An update has downloaded and is ready.
       <button

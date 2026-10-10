@@ -106,8 +106,13 @@ export const EXHAUSTION_EFFECTS = [
   'Death'
 ]
 
-export function rollD20(): number {
-  return Math.floor(Math.random() * 20) + 1
+// Spell attack bonus and save DC from the character's chosen casting ability
+// — null when the character isn't set up as a caster.
+export function spellStats(c: Character): { attackBonus: number; saveDc: number } | null {
+  if (!c.spellcasting_ability) return null
+  const mod = abilityMod(c[c.spellcasting_ability])
+  const pb = c.proficiency_bonus ?? 0
+  return { attackBonus: mod + pb, saveDc: 8 + mod + pb }
 }
 
 export const ARMOR_PROFICIENCY_OPTIONS = ['Light Armor', 'Medium Armor', 'Heavy Armor', 'Shields']

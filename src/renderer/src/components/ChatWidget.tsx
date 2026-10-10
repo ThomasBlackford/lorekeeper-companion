@@ -18,8 +18,9 @@ export function ChatWidget({ character, onUpdate }: Props) {
   const [tab, setTab] = useState<ChatTab>('party')
 
   const [address, setAddress] = useState(character.dm_server_address)
-  const [status, setStatus] = useState<SyncStatus>({ connected: false, address: null, error: null })
-  const [connecting, setConnecting] = useState(false)
+  const [code, setCode] = useState(character.dm_join_code)
+  const [status, setStatus] = useState<SyncStatus>({ connected: false, connecting: false, address: null, error: null })
+  const [formError, setFormError] = useState<string | null>(null)
 
   const [partyMessages, setPartyMessages] = useState<PartyChatMessage[]>([])
   const [partyText, setPartyText] = useState('')
@@ -30,19 +31,27 @@ export function ChatWidget({ character, onUpdate }: Props) {
   const [seenDm, setSeenDm] = useState(0)
 
   useEffect(() => setAddress(character.dm_server_address), [character.dm_server_address])
+  useEffect(() => setCode(character.dm_join_code), [character.dm_join_code])
 
   useEffect(() => {
     window.api.sync.status().then((s) => {
-      setStatus({ connected: s.connected, address: s.address, error: s.error })
+      setStatus({ connected: s.connected, connecting: s.connecting, address: s.address, error: s.error })
       setPartyMessages(s.messages)
       setDmThread(s.dmReplies.map((r) => ({ from: 'dm' as const, text: r.text, at: r.at })))
     })
-    const cleanupStatus = window.api.sync.onStatus(setStatus)
+    const cleanupStatus = window.api.sync.onStatus((next) => {
+      setStatus(next)
+      setFormError(null)
+      // The main process saves the address once a connection actually opens;
+      // pull the fresh sheet so character.dm_server_address stays current.
+      if (next.connected) window.api.character.get().then(onUpdate)
+    })
     const cleanupMsg = window.api.sync.onPartyMessage((m) => setPartyMessages((prev) => [...prev, m]))
     const cleanupReply = window.api.sync.onDmReply((r) =>
       setDmThread((prev) => [...prev, { from: 'dm', text: r.text, at: r.at }])
     )
     return () => { cleanupStatus(); cleanupMsg(); cleanupReply() }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function toggleOpen() {
@@ -56,16 +65,14 @@ export function ChatWidget({ character, onUpdate }: Props) {
     })
   }
 
+  // The socket opens asynchronously in the main process — this call only
+  // starts the attempt (or rejects an unusable address). Progress, success
+  // and failure all arrive through the status stream, which is also what
+  // saves the address (main process, on a successful open).
   async function handleConnect() {
-    setConnecting(true)
-    const result = await window.api.sync.connect(address)
-    setConnecting(false)
-    if (!result.ok) {
-      alert(`Couldn't connect: ${result.error}`)
-      return
-    }
-    const c = await window.api.character.save({ dm_server_address: address })
-    onUpdate(c)
+    setFormError(null)
+    const result = await window.api.sync.connect(address, code)
+    if (!result.ok) setFormError(result.error ?? 'Could not connect.')
   }
 
   async function handleDisconnect() {
@@ -124,18 +131,28 @@ export function ChatWidget({ character, onUpdate }: Props) {
                 onChange={(e) => setAddress(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleConnect()}
               />
+              <input
+                className="input text-xs py-1.5 tracking-[0.3em] uppercase"
+                placeholder="Join code (e.g. K7QX)"
+                maxLength={8}
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                onKeyDown={(e) => e.key === 'Enter' && handleConnect()}
+              />
               <p className="text-[10px] text-slate-600">
-                Ask the DM for this — it's shown in their app once they start Player Sync. You both need to be on
-                the same WiFi network.
+                The DM's app shows the address and join code on the Party page once they start Player Sync. You both
+                need to be on the same WiFi network.
               </p>
               <button
                 onClick={handleConnect}
-                disabled={connecting || !address.trim()}
+                disabled={status.connecting || !address.trim()}
                 className="btn-primary text-xs py-1.5 w-full disabled:opacity-40"
               >
-                {connecting ? 'Connecting…' : 'Connect'}
+                {status.connecting ? 'Connecting…' : 'Connect'}
               </button>
-              {status.error && <p className="text-[11px] text-red-400">{status.error}</p>}
+              {(formError || status.error) && (
+                <p className="text-[11px] text-red-400 leading-relaxed">{formError ?? status.error}</p>
+              )}
             </div>
           ) : (
             <div className="flex items-center justify-between px-3 py-2 border-b border-border flex-shrink-0 text-[11px]">

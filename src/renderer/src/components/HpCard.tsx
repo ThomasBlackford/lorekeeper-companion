@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Minus, Plus, Skull, Dices, Sparkles, X } from 'lucide-react'
 import type { Character } from '../types'
+import { useRolls } from '../contexts/RollContext'
 
 function DeathSavePips({
   count, kind, onSet
@@ -29,9 +30,13 @@ interface Props {
     'hp_current' | 'hp_max' | 'hp_temp' | 'death_save_successes' | 'death_save_failures'
     | 'hit_dice_total' | 'hit_dice_current' | 'hit_die_size'
   >>) => void
+  // For actions whose IPC call returns a whole fresh character (spending a
+  // Hit Die, dropping concentration) rather than a field patch.
+  onCharacter: (c: Character) => void
 }
 
-export function HpCard({ character, onChange }: Props) {
+export function HpCard({ character, onChange, onCharacter }: Props) {
+  const rolls = useRolls()
   const [current, setCurrent] = useState(String(character.hp_current ?? ''))
   const [max, setMax] = useState(String(character.hp_max ?? ''))
   const [temp, setTemp] = useState(String(character.hp_temp || ''))
@@ -81,10 +86,15 @@ export function HpCard({ character, onChange }: Props) {
     const base = character.hp_current ?? 0
     const nextCurrent = Math.max(0, base - remaining)
     onChange({ hp_temp: tempPool - absorbed, hp_current: nextCurrent })
+    // Damage that actually got through to real HP while concentrating → CON save.
+    if (remaining > 0 && character.concentration_spell_name) rolls.promptConcentration(remaining)
   }
 
   async function handleSpendHitDie() {
     const result = await window.api.hitDice.spend()
+    // The handler returns the updated sheet — without applying it the HP
+    // on screen stays stale until some unrelated edit refreshes it.
+    onCharacter(result.character)
     if (result.healed) setRollFlash(`Rolled ${result.rolled} → healed ${result.healed}`)
     setTimeout(() => setRollFlash(null), 3000)
   }
@@ -103,7 +113,7 @@ export function HpCard({ character, onChange }: Props) {
   }
 
   async function handleDropConcentration() {
-    await window.api.character.save({ concentration_spell_name: '' })
+    onCharacter(await window.api.character.save({ concentration_spell_name: '' }))
   }
 
   const isDown = character.hp_current != null && character.hp_current <= 0

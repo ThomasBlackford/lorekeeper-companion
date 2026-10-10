@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { Dices } from 'lucide-react'
 import type { Character } from '../types'
+import { useRolls } from '../contexts/RollContext'
+import { abilityMod } from '../lib/dnd'
 
 function VitalTile({
   label, value, onCommit, prefix, suffix, onRoll, rollTitle
@@ -54,9 +56,10 @@ interface Props {
 }
 
 export function VitalsRow({ character, onChange }: Props) {
+  const rolls = useRolls()
   function rollInitiative() {
-    const dexMod = Math.floor((character.dex_score - 10) / 2)
-    onChange({ initiative: Math.floor(Math.random() * 20) + 1 + dexMod + character.initiative_bonus })
+    const entry = rolls.rollCheck('Initiative', abilityMod(character.dex_score) + character.initiative_bonus)
+    onChange({ initiative: entry.total })
   }
 
   return (

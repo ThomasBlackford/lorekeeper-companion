@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { AbilityScoreKey, Character } from './types'
 import { useSettings } from './contexts/SettingsContext'
+import { proficiencyBonusForLevel } from './lib/dnd'
 import { CharacterHeader } from './components/CharacterHeader'
 import { CoreStatsCard } from './components/CoreStatsCard'
 import { HpCard } from './components/HpCard'
@@ -13,23 +14,45 @@ import { NotesSection } from './components/NotesSection'
 import { SettingsButton } from './components/SettingsButton'
 import { ChatWidget } from './components/ChatWidget'
 import { UpdateBanner } from './components/UpdateBanner'
+import { ToastHost } from './components/ToastHost'
+import { RollToast, RollPanel } from './components/RollPanel'
+import { DmEventsHost } from './components/DmEventsHost'
+import { ConcentrationPrompt } from './components/ConcentrationPrompt'
+import { useConfirm } from './hooks/useConfirm'
 
 export function App() {
   const { layout } = useSettings()
   const [character, setCharacter] = useState<Character | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const { ask, dialog } = useConfirm()
 
   useEffect(() => {
-    window.api.character.get().then((c) => {
-      setCharacter(c)
-      setLoading(false)
-    })
+    window.api.character
+      .get()
+      .then((c) => setCharacter(c))
+      .catch((e) => setLoadError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoading(false))
   }, [])
 
   async function handleSaveHeader(
-    changes: Partial<Pick<Character, 'name' | 'race' | 'class' | 'level' | 'alignment' | 'inspiration'>>
+    changes: Partial<Pick<Character, 'name' | 'race' | 'class' | 'level' | 'alignment' | 'inspiration' | 'xp'>>
   ) {
     const c = await window.api.character.save(changes)
+    setCharacter(c)
+  }
+
+  // Levelling up moves the things that depend on level along with it: the
+  // proficiency bonus, and one more Hit Die (which also comes back full).
+  async function handleLevelUp() {
+    if (!character) return
+    const next = Math.min(20, character.level + 1)
+    const c = await window.api.character.save({
+      level: next,
+      proficiency_bonus: proficiencyBonusForLevel(next),
+      hit_dice_total: (character.hit_dice_total ?? character.level) + 1,
+      hit_dice_current: (character.hit_dice_current ?? character.hit_dice_total ?? character.level) + 1
+    })
     setCharacter(c)
   }
 
@@ -75,16 +98,27 @@ export function App() {
     setCharacter(c)
   }
 
-  async function handleLongRest() {
-    if (!confirm('Take a long rest? This restores long-rest abilities and all spell slots.')) return
-    const c = await window.api.rest.long()
-    setCharacter(c)
+  function handleLongRest() {
+    ask({
+      title: 'Take a long rest?',
+      message: 'Restores long-rest abilities, all spell slots, and half your spent Hit Dice, and clears temporary HP.',
+      confirmLabel: 'Long rest',
+      onYes: async () => setCharacter(await window.api.rest.long())
+    })
   }
 
   if (loading || !character) {
     return (
-      <div className="h-screen flex items-center justify-center">
-        <p className="text-slate-600 text-sm">Loading…</p>
+      <div className="h-screen flex items-center justify-center p-6 text-center">
+        {loadError ? (
+          <div className="space-y-3 max-w-sm">
+            <p className="text-sm text-slate-300">Couldn't load your character.</p>
+            <p className="text-xs text-red-300/80">{loadError}</p>
+            <button className="btn-primary text-sm" onClick={() => window.location.reload()}>Reload</button>
+          </div>
+        ) : (
+          <p className="text-slate-600 text-sm">Loading…</p>
+        )}
       </div>
     )
   }
@@ -93,7 +127,7 @@ export function App() {
 
   const sidebar = (
     <>
-      <CharacterHeader character={character} onSave={handleSaveHeader} />
+      <CharacterHeader character={character} onSave={handleSaveHeader} onCharacter={setCharacter} onLevelUp={handleLevelUp} />
 
       <CoreStatsCard
         character={character}
@@ -102,7 +136,7 @@ export function App() {
       />
 
       <div className={isWide ? 'space-y-5' : 'grid sm:grid-cols-2 gap-5'}>
-        <HpCard character={character} onChange={handleHpChange} />
+        <HpCard character={character} onChange={handleHpChange} onCharacter={setCharacter} />
         <div className="bg-surface-raised border border-border rounded-xl p-4 flex flex-col justify-center gap-3">
           <h2 className="text-xs uppercase tracking-widest text-slate-500 font-medium">Rest</h2>
           <RestButtons onShortRest={handleShortRest} onLongRest={handleLongRest} />
@@ -127,10 +161,12 @@ export function App() {
 
   return (
     <>
-      <div className="h-screen overflow-y-auto bg-surface-base">
+      <div className="app-topbar" />
+      <div className="h-screen overflow-y-auto">
         {isWide ? (
           <div className="max-w-6xl mx-auto px-6 py-8">
-            <div className="grid grid-cols-[340px_1fr] gap-6 items-start">
+            {/* Two columns only once there is room for them; narrower windows stack. */}
+            <div className="grid grid-cols-1 min-[900px]:grid-cols-[340px_minmax(0,1fr)] gap-6 items-start">
               <div className="space-y-5">{sidebar}</div>
               <div className="space-y-5">{main}</div>
             </div>
@@ -146,6 +182,12 @@ export function App() {
       <SettingsButton />
       <ChatWidget character={character} onUpdate={setCharacter} />
       <UpdateBanner />
+      <ToastHost />
+      <RollToast />
+      <RollPanel />
+      <DmEventsHost character={character} onCharacter={setCharacter} />
+      <ConcentrationPrompt character={character} onCharacter={setCharacter} />
+      {dialog}
     </>
   )
 }

@@ -8,6 +8,8 @@ const api = {
     updateDefenses: (defenses: unknown[]) => ipcRenderer.invoke('character:updateDefenses', defenses),
     updateConditions: (conditions: unknown[]) => ipcRenderer.invoke('character:updateConditions', conditions),
     updateBackground: (background: unknown) => ipcRenderer.invoke('character:updateBackground', background),
+    pickPortrait: () => ipcRenderer.invoke('character:pickPortrait'),
+    clearPortrait: () => ipcRenderer.invoke('character:clearPortrait'),
     updateSkills: (skills: unknown) => ipcRenderer.invoke('character:updateSkills', skills),
     updateProficiencies: (changes: Record<string, unknown>) =>
       ipcRenderer.invoke('character:updateProficiencies', changes)
@@ -44,7 +46,18 @@ const api = {
     spend: () => ipcRenderer.invoke('hitDice:spend')
   },
   sync: {
-    connect: (address: string) => ipcRenderer.invoke('sync:connect', address),
+    connect: (address: string, code?: string) => ipcRenderer.invoke('sync:connect', address, code),
+    sendRollResult: (payload: unknown) => ipcRenderer.invoke('sync:sendRollResult', payload),
+    onDmEvent: (cb: (evt: unknown) => void) => {
+      const handler = (_e: IpcRendererEvent, evt: unknown) => cb(evt)
+      ipcRenderer.on('dm:event', handler)
+      return () => ipcRenderer.removeListener('dm:event', handler)
+    },
+    onCharacterChanged: (cb: (c: unknown) => void) => {
+      const handler = (_e: IpcRendererEvent, c: unknown) => cb(c)
+      ipcRenderer.on('character:changed', handler)
+      return () => ipcRenderer.removeListener('character:changed', handler)
+    },
     disconnect: () => ipcRenderer.invoke('sync:disconnect'),
     status: () => ipcRenderer.invoke('sync:status'),
     sendDmMessage: (text: string) => ipcRenderer.invoke('sync:sendDmMessage', text),
@@ -64,6 +77,15 @@ const api = {
       ipcRenderer.on('sync:dmReply', handler)
       return () => ipcRenderer.removeListener('sync:dmReply', handler)
     }
+  },
+  backup: {
+    export: () => ipcRenderer.invoke('backup:export'),
+    import: () => ipcRenderer.invoke('backup:import'),
+    info: () => ipcRenderer.invoke('backup:info'),
+    openFolder: () => ipcRenderer.invoke('backup:openFolder')
+  },
+  app: {
+    version: () => ipcRenderer.invoke('app:version') as Promise<string>
   },
   updater: {
     status: () => ipcRenderer.invoke('updater:status'),

@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react'
 import type { ActionCategory, Character, CombatAction } from '../types'
 import { ActionRow } from './ActionRow'
 import { ActionForm } from './ActionForm'
+import { useConfirm } from '../hooks/useConfirm'
 
 interface Props {
   character: Character
@@ -22,6 +23,7 @@ export function ActionsSection({ character, onUpdate }: Props) {
   const [filter, setFilter] = useState<ActionCategory | 'all'>('all')
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const { ask, dialog } = useConfirm()
 
   async function handleAdd(data: Partial<CombatAction> & { name: string }) {
     const c = await window.api.actions.add(data)
@@ -38,6 +40,16 @@ export function ActionsSection({ character, onUpdate }: Props) {
     const c = await window.api.actions.remove(id)
     onUpdate(c)
     setEditingId(null)
+  }
+
+  function requestRemove(x: { id: string; name: string }) {
+    ask({
+      title: `Delete ${x.name}?`,
+      message: "This can't be undone.",
+      confirmLabel: 'Delete',
+      danger: true,
+      onYes: () => handleRemove(x.id)
+    })
   }
 
   function handleUse(a: CombatAction, sign: 1 | -1) {
@@ -80,8 +92,8 @@ export function ActionsSection({ character, onUpdate }: Props) {
         </div>
       )}
 
-      <div className="overflow-x-auto">
-        <div className="space-y-1.5 min-w-[560px]">
+      <div>
+        <div className="space-y-1.5">
           {filtered.length === 0 && !adding ? (
             <p className="text-xs text-slate-600 text-center py-4">No actions yet.</p>
           ) : (
@@ -92,14 +104,14 @@ export function ActionsSection({ character, onUpdate }: Props) {
                   initial={a}
                   onSave={(changes) => handleUpdate(a.id, changes).then(() => setEditingId(null))}
                   onCancel={() => setEditingId(null)}
-                  onDelete={() => handleRemove(a.id)}
+                  onDelete={() => requestRemove(a)}
                 />
               ) : (
                 <ActionRow
                   key={a.id}
                   action={a}
                   onEdit={() => setEditingId(a.id)}
-                  onDelete={() => handleRemove(a.id)}
+                  onDelete={() => requestRemove(a)}
                   onUse={() => handleUse(a, -1)}
                   onRestore={() => handleUse(a, 1)}
                 />
@@ -108,6 +120,7 @@ export function ActionsSection({ character, onUpdate }: Props) {
           )}
         </div>
       </div>
+      {dialog}
     </div>
   )
 }

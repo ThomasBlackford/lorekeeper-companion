@@ -1,4 +1,6 @@
+import type { ReactNode } from 'react'
 import { X } from 'lucide-react'
+import { ModalShell } from './ModalShell'
 
 export interface DetailStat {
   label: string
@@ -14,21 +16,19 @@ interface Props {
   notes?: string            // short reference line (weapon properties, etc.)
   description?: string
   usesLabel?: string        // e.g. "3/3 uses — Long Rest"
+  footer?: ReactNode        // action buttons (roll attack, cast…)
 }
 
 // A single reusable "what does this actually do" popup — click a name
 // anywhere (Actions, Spells, Features, the Play tab) to read the full
 // entry without navigating into its edit form. Editing stays a deliberate,
 // separate action (the pencil icon on each row).
-export function DetailCard({ onClose, title, categoryLabel, badges, stats, notes, description, usesLabel }: Props) {
+export function DetailCard({ onClose, title, categoryLabel, badges, stats, notes, description, usesLabel, footer }: Props) {
   const hasContent = (stats && stats.length > 0) || notes || description || usesLabel
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div
-        className="modal max-w-sm max-h-[80vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <ModalShell onClose={onClose} className="max-w-sm max-h-[80vh] flex flex-col">
+      <>
         <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border flex-shrink-0">
           <div className="min-w-0">
             <h2 className="font-display text-base font-semibold text-white leading-tight">{title}</h2>
@@ -70,12 +70,14 @@ export function DetailCard({ onClose, title, categoryLabel, badges, stats, notes
           {!hasContent && <p className="text-xs text-slate-600 italic">Nothing else written for this yet.</p>}
         </div>
 
+        {footer && <div className="px-5 py-3 border-t border-border flex-shrink-0">{footer}</div>}
+
         {usesLabel && (
           <div className="px-5 py-2.5 border-t border-border flex-shrink-0 text-xs text-slate-500">
             {usesLabel}
           </div>
         )}
-      </div>
-    </div>
+      </>
+    </ModalShell>
   )
 }

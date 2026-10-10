@@ -18,7 +18,7 @@ export function RestButtons({ onShortRest, onLongRest }: Props) {
       <button
         onClick={onLongRest}
         className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm
-                   bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 hover:bg-indigo-500/30 transition-colors"
+                   bg-amber-500/15 border border-amber-500/40 text-amber-300 hover:bg-amber-500/25 transition-colors"
       >
         <Moon size={14} /> Long Rest
       </button>

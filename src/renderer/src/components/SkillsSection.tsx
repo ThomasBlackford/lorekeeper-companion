@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { Dices } from 'lucide-react'
 import type { AbilityScoreKey, Character, SkillId, SkillProficiency } from '../types'
 import {
-  ABILITY_ORDER, ABILITY_SHORT, EXHAUSTION_EFFECTS, SKILLS,
-  abilityMod, fmtMod, proficiencyBonusForLevel, rollD20, saveModifier, skillModifier
+  ABILITY_LABELS, ABILITY_ORDER, ABILITY_SHORT, EXHAUSTION_EFFECTS, SKILLS,
+  abilityMod, fmtMod, proficiencyBonusForLevel, saveModifier, skillModifier
 } from '../lib/dnd'
+import { useRolls } from '../contexts/RollContext'
 import { Stepper } from './Stepper'
 import { ProficienciesPanel } from './ProficienciesPanel'
 
@@ -52,9 +53,15 @@ function RollableValue({ rollKey, modifier, rolls, onRoll }: {
 
 export function SkillsSection({ character, onUpdate }: Props) {
   const [rolls, setRolls] = useState<Record<string, number>>({})
+  const roller = useRolls()
 
   function handleRoll(key: string, modifier: number) {
-    const total = rollD20() + modifier
+    const [kind, id] = key.split(':')
+    const label =
+      kind === 'save'
+        ? `${ABILITY_LABELS[id as AbilityScoreKey]} save`
+        : `${SKILLS.find((s) => s.key === id)?.label ?? id} check`
+    const total = roller.rollCheck(label, modifier).total
     setRolls((prev) => ({ ...prev, [key]: total }))
     setTimeout(() => setRolls((prev) => { const { [key]: _drop, ...rest } = prev; return rest }), 2500)
   }

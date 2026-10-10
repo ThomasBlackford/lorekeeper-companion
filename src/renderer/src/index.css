@@ -11,30 +11,69 @@
    Tailwind's rgb(var(--x) / <alpha-value>) pattern requires so that
    opacity modifiers like amber-500/20 keep working. */
 :root {
-  --color-accent-300: 252 211 77;  /* amber-300 */
-  --color-accent-400: 251 191 36;  /* amber-400 */
-  --color-accent-500: 245 158 11;  /* amber-500 */
+  /* Default palette: blood red on near-black. Accent channels are
+     space-separated RGB so Tailwind opacity modifiers like amber-500/20 keep working. */
+  --color-accent-200: 252 200 200;
+  --color-accent-300: 248 150 150;
+  --color-accent-400: 228 70 78;
+  --color-accent-500: 168 22 36;
+  --btn-text: 255 255 255;
+
+  /* Six-stop gradients running black → deep red → black. Buttons and the top
+     bar use the brighter ramp; the page background stays much darker so text
+     contrast is never compromised. */
+  --gradient-btn: linear-gradient(135deg, #1a0306 0%, #3d0610 20%, #66091a 40%, #8a0f20 60%, #55081a 80%, #1a0306 100%);
+  --gradient-brand: linear-gradient(90deg, #000000 0%, #2a040a 20%, #66091a 40%, #a3142a 60%, #3d0610 80%, #000000 100%);
+  --gradient-app: linear-gradient(160deg, #000000 0%, #060102 18%, #170306 38%, #2e0509 55%, #120306 78%, #000000 100%);
+
   --font-display: 'Cinzel', Georgia, serif;
-  --radius-card: 0.75rem;
-  --radius-input: 0.5rem;
+  --radius-card: 0;
+  --radius-input: 0;
 }
 
 [data-color='crimson'] {
-  --color-accent-300: 252 165 165; /* red-300 */
-  --color-accent-400: 248 113 113; /* red-400 */
-  --color-accent-500: 239 68 68;   /* red-500 */
+  --color-accent-200: 252 200 200;
+  --color-accent-300: 248 150 150;
+  --color-accent-400: 228 70 78;
+  --color-accent-500: 168 22 36;
+  --btn-text: 255 255 255;
+  --gradient-btn: linear-gradient(135deg, #1a0306 0%, #3d0610 20%, #66091a 40%, #8a0f20 60%, #55081a 80%, #1a0306 100%);
+  --gradient-brand: linear-gradient(90deg, #000000 0%, #2a040a 20%, #66091a 40%, #a3142a 60%, #3d0610 80%, #000000 100%);
+  --gradient-app: linear-gradient(160deg, #000000 0%, #060102 18%, #170306 38%, #2e0509 55%, #120306 78%, #000000 100%);
+}
+
+[data-color='amber'] {
+  --color-accent-200: 253 230 138;
+  --color-accent-300: 252 211 77;
+  --color-accent-400: 251 191 36;
+  --color-accent-500: 245 158 11;
+  --btn-text: 255 255 255;
+  --gradient-btn: linear-gradient(135deg, #3b2a05 0%, #5e430a 20%, #8a620c 40%, #b8820f 60%, #7a5509 80%, #3b2a05 100%);
+  --gradient-brand: linear-gradient(90deg, #000000 0%, #3b2a05 20%, #8a620c 40%, #d19a1c 60%, #5e430a 80%, #000000 100%);
+  --gradient-app: linear-gradient(160deg, #050301 0%, #1a1005 20%, #38250a 40%, #4a330e 55%, #271a07 78%, #060401 100%);
 }
 
 [data-color='arcane'] {
-  --color-accent-300: 216 180 254; /* purple-300 */
-  --color-accent-400: 192 132 252; /* purple-400 */
-  --color-accent-500: 168 85 247;  /* purple-500 */
+  --color-accent-200: 233 213 255;
+  --color-accent-300: 216 180 254;
+  --color-accent-400: 192 132 252;
+  --color-accent-500: 168 85 247;
+  --btn-text: 255 255 255;
+  --gradient-btn: linear-gradient(135deg, #1f0a3a 0%, #34105f 20%, #4f1a8f 40%, #6d28c4 60%, #44157a 80%, #1f0a3a 100%);
+  --gradient-brand: linear-gradient(90deg, #000000 0%, #1f0a3a 20%, #4f1a8f 40%, #7e3bd9 60%, #34105f 80%, #000000 100%);
+  --gradient-app: linear-gradient(160deg, #030104 0%, #0f0620 20%, #1f0c3a 40%, #2a1050 55%, #12072a 78%, #030104 100%);
 }
 
 [data-style='modern'] {
   --font-display: 'Inter', system-ui, sans-serif;
-  --radius-card: 0.5rem;
-  --radius-input: 0.375rem;
+  --radius-card: 0;
+  --radius-input: 0;
+}
+
+html, body { background-color: #040102; }
+html[data-color] body {
+  background-image: var(--gradient-app);
+  background-attachment: fixed;
 }
 
 @layer base {
@@ -46,8 +85,7 @@
     height: 100%;
     margin: 0;
     padding: 0;
-    background-color: #0d1117;
-    color: #e2e8f0;
+    color: #ece6e4;
     font-family: 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
@@ -59,12 +97,15 @@
   ::-webkit-scrollbar-track {
     background: transparent;
   }
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
   ::-webkit-scrollbar-thumb {
-    background: #2a3050;
+    background: #3a1a1f;
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #3a4060;
+    background: #5a2a30;
   }
 }
 
@@ -106,19 +147,49 @@
   100% { opacity: 0; }
 }
 
-.animate-fade-in    { animation: fade-in 300ms ease-out both; }
-.animate-fade-in-up  { animation: fade-in-up 300ms cubic-bezier(0.16, 1, 0.3, 1) both; }
-.animate-popover     { animation: popover-in 300ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-fade-in    { animation: fade-in 500ms ease-out both; }
+.animate-fade-in-up  { animation: fade-in-up 500ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+.animate-popover     { animation: popover-in 500ms cubic-bezier(0.16, 1, 0.3, 1) both; }
 .animate-toast        { animation: toast-in 2.4s ease-out forwards; }
+
+/* A thin six-stop gradient strip across the very top of each themed window —
+   the one place the brand gradient shows at full strength. */
+.app-topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--gradient-brand);
+  z-index: 45;
+  pointer-events: none;
+}
+
+/* Scrollable strips (tab bars) that shouldn't draw a scrollbar. */
+.no-scrollbar { scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
 
 @layer components {
   .btn-primary {
-    @apply bg-amber-500 hover:bg-amber-400 active:scale-[0.97] text-slate-900 font-semibold px-4 py-2 rounded-lg
-           transition-[background-color,transform] duration-300 text-sm;
+    @apply font-semibold px-4 py-2 rounded-lg text-sm active:scale-[0.97]
+           border border-red-950/70 transition-[background-position,transform,box-shadow] duration-500;
+    color: rgb(var(--btn-text));
+    background-image: var(--gradient-btn);
+    background-size: 220% 100%;
+    background-position: 0% 50%;
+  }
+  .btn-primary:hover:not(:disabled) {
+    background-position: 100% 50%;
+    box-shadow: 0 6px 20px -8px rgb(var(--color-accent-500) / 0.65);
   }
   .btn-ghost {
     @apply bg-transparent hover:bg-white/5 active:scale-[0.97] text-slate-300 hover:text-white px-4 py-2 rounded-lg
-           transition-[background-color,color,border-color,transform] duration-300 text-sm border border-transparent hover:border-white/10;
+           transition-[background-color,color,border-color,transform] duration-500 text-sm border border-transparent hover:border-white/10;
+  }
+
+  .btn-danger {
+    @apply bg-red-500/15 hover:bg-red-500/25 active:scale-[0.97] text-red-300 px-4 py-2 rounded-lg
+           transition-[background-color,transform] duration-500 text-sm border border-red-500/30;
   }
 
   .input {
@@ -132,16 +203,16 @@
      than a glassmorphism effect behind it. */
   .modal-backdrop {
     @apply fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4;
-    animation: backdrop-in 300ms ease-out both;
+    animation: backdrop-in 500ms ease-out both;
   }
   .modal {
     @apply bg-surface-raised border border-border rounded-xl shadow-2xl w-full;
-    animation: panel-in 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: panel-in 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
   }
 
   /* A clickable row (spell/action/ability/inventory list item) — press
      feedback only, no lift, since rows sit flush against their neighbors. */
   .row-interactive {
-    @apply transition-[background-color,transform] duration-300 active:scale-[0.99];
+    @apply transition-[background-color,transform] duration-500 active:scale-[0.99];
   }
 }

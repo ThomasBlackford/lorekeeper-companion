@@ -187,10 +187,17 @@ export interface Character {
   exhaustion_level: number // 0-6, per 5E's escalating exhaustion levels
   spellcasting_ability: AbilityScoreKey | null
   spellcasting_class: string
-  gold: number
+  gold: number // gp — the original single coin field
+  xp: number
+  cp: number
+  sp: number
+  ep: number
+  pp: number
+  portrait_path: string
   notes: string
   background: Background
   dm_server_address: string
+  dm_join_code: string
   resources: Resource[]
   defenses: Defense[]
   conditions: Condition[]
@@ -209,6 +216,7 @@ export interface Character {
 
 export interface SyncStatus {
   connected: boolean
+  connecting: boolean
   address: string | null
   error: string | null
 }
@@ -222,4 +230,25 @@ export interface PartyChatMessage {
 export interface DmReply {
   text: string
   at: number
+}
+
+// What the DM can push to this player. Mirrors the server's DmCommand — the
+// player's main process applies state changes itself and forwards this to the
+// UI purely so it can be shown.
+export interface DmEvent {
+  id: string
+  summary: string
+  extra?: { kind?: 'damage' | 'heal'; amount?: number; concentration?: string; droppedToZero?: boolean }
+  cmd:
+    | { cmd: 'hp_delta'; amount: number }
+    | { cmd: 'condition'; condition: string; on: boolean }
+    | { cmd: 'currency' }
+    | { cmd: 'xp'; amount: number }
+    | { cmd: 'inspiration'; on: boolean }
+    | { cmd: 'rest'; kind: 'short' | 'long' }
+    | { cmd: 'give_item'; name: string }
+    | { cmd: 'roll_request'; rollId: string; label: string; kind: 'save' | 'check' | 'skill' | 'initiative' | 'custom'; ability?: string; skill?: string; dc?: number | null }
+    | { cmd: 'turn'; state: 'your_turn' | 'up_next'; round: number }
+    | { cmd: 'handout'; title: string; text: string; imageDataUrl?: string }
+    | { cmd: 'notice'; text: string }
 }

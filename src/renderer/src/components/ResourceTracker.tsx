@@ -72,7 +72,7 @@ export function ResourceTracker({
           </div>
           <div className="relative h-2 rounded-full overflow-hidden bg-surface-overlay">
             <div
-              className="absolute left-0 top-0 h-full rounded-full transition-all duration-300"
+              className="absolute left-0 top-0 h-full rounded-full transition-all duration-500"
               style={{
                 width: `${r.max > 0 ? Math.min(100, (r.current / r.max) * 100) : 0}%`,
                 backgroundColor: r.color

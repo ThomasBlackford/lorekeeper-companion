@@ -1,6 +1,6 @@
 import type {
   Ability, Background, Character, CombatAction, Condition, Defense, DmReply,
-  InventoryItem, PartyChatMessage, Resource, SkillProficiencies, Spell, SyncStatus
+  InventoryItem, PartyChatMessage, Resource, SkillProficiencies, Spell, SyncStatus, DmEvent
 } from './index'
 
 interface ElectronAPI {
@@ -17,9 +17,12 @@ interface ElectronAPI {
           | 'hit_dice_total' | 'hit_dice_current' | 'hit_die_size' | 'inspiration' | 'concentration_spell_name'
           | 'exhaustion_level'
           | 'spellcasting_ability' | 'spellcasting_class' | 'gold' | 'notes' | 'dm_server_address'
+          | 'xp' | 'cp' | 'sp' | 'ep' | 'pp' | 'portrait_path'
         >
       >
     ) => Promise<Character>
+    pickPortrait: () => Promise<Character | null>
+    clearPortrait: () => Promise<Character>
     updateResources: (resources: Resource[]) => Promise<Character>
     updateDefenses: (defenses: Defense[]) => Promise<Character>
     updateConditions: (conditions: Condition[]) => Promise<Character>
@@ -65,7 +68,10 @@ interface ElectronAPI {
     spend: () => Promise<{ character: Character; rolled: number; healed?: number }>
   }
   sync: {
-    connect: (address: string) => Promise<{ ok: boolean; error?: string }>
+    connect: (address: string, code?: string) => Promise<{ ok: boolean; error?: string }>
+    sendRollResult: (payload: { rollId?: string; label: string; total: number; natural: number; modifier: number; dc?: number | null }) => Promise<void>
+    onDmEvent: (cb: (evt: DmEvent) => void) => () => void
+    onCharacterChanged: (cb: (c: Character) => void) => () => void
     disconnect: () => Promise<void>
     status: () => Promise<SyncStatus & { messages: PartyChatMessage[]; dmReplies: DmReply[] }>
     sendDmMessage: (text: string) => Promise<void>
@@ -73,6 +79,15 @@ interface ElectronAPI {
     onStatus: (cb: (status: SyncStatus) => void) => () => void
     onPartyMessage: (cb: (msg: PartyChatMessage) => void) => () => void
     onDmReply: (cb: (msg: DmReply) => void) => () => void
+  }
+  backup: {
+    export: () => Promise<{ ok: boolean; canceled?: boolean; error?: string; path?: string }>
+    import: () => Promise<{ ok: boolean; canceled?: boolean; error?: string }>
+    info: () => Promise<{ dir: string; autos: { name: string; size: number; modified: number }[] }>
+    openFolder: () => Promise<void>
+  }
+  app: {
+    version: () => Promise<string>
   }
   updater: {
     status: () => Promise<{ ready: boolean }>

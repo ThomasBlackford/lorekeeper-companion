@@ -3,6 +3,8 @@ import { Sparkles } from 'lucide-react'
 import type { Ability, Character, CombatAction, Spell } from '../types'
 import { fmtMod } from '../lib/dnd'
 import { DetailCard } from './DetailCard'
+import { AttackRollButtons } from './AttackRollButtons'
+import { CastDialog } from './CastDialog'
 
 const ACTION_CATEGORY_LABEL: Record<string, string> = {
   attack: 'Attacks', action: 'Actions', bonus_action: 'Bonus Actions', reaction: 'Reactions', other: 'Other'
@@ -44,8 +46,15 @@ type OpenCard =
 // does mid-session. Each row is a one-line summary; click it for the full
 // entry in a DetailCard instead of always showing every description at
 // once, which gets unreadably long past a handful of spells.
-export function PlayModeSection({ character }: { character: Character }) {
+export function PlayModeSection({
+  character, onUpdate, onNavigate
+}: {
+  character: Character
+  onUpdate: (c: Character) => void
+  onNavigate: (tab: 'actions' | 'skills' | 'spells' | 'inventory' | 'features') => void
+}) {
   const [openCard, setOpenCard] = useState<OpenCard>(null)
+  const [casting, setCasting] = useState<Spell | null>(null)
 
   const actionsByCategory = ACTION_CATEGORY_ORDER
     .map((cat) => ({ cat, items: character.actions.filter((a) => a.category === cat) }))
@@ -62,9 +71,35 @@ export function PlayModeSection({ character }: { character: Character }) {
   return (
     <div className="space-y-6">
       {character.actions.length === 0 && character.spells.length === 0 && character.abilities.length === 0 && (
-        <p className="text-xs text-slate-600 text-center py-6">
-          Nothing to show yet — add actions, spells, or features in their own tabs and they'll appear here.
-        </p>
+        <div className="border border-border bg-surface-overlay/40 p-5">
+          <h3 className="font-display text-sm font-semibold text-white uppercase tracking-widest mb-1">Getting started</h3>
+          <p className="text-xs text-slate-500 mb-4">
+            This screen fills in as you build your character — everything you need at the table, in one place.
+          </p>
+          <ol className="space-y-2 text-xs">
+            {[
+              ['1', 'Set your name, race, class and level at the top, then your HP, AC and ability scores.', null],
+              ['2', 'Mark your proficient skills and saving throws.', ['skills', 'Open Skills'] as const],
+              ['3', 'Add your spells from the built-in library.', ['spells', 'Open Spells'] as const],
+              ['4', 'Add your weapons and armor — weapons appear under Actions with rollable attacks.', ['inventory', 'Open Inventory'] as const],
+              ['5', 'Add class features and feats so their descriptions are one click away.', ['features', 'Open Features'] as const],
+              ['6', 'Join your DM: use the chat button (bottom right) with the address and join code from their app.', null]
+            ].map(([n, text, action]) => (
+              <li key={n as string} className="flex items-start gap-3">
+                <span className="w-5 h-5 flex-shrink-0 flex items-center justify-center text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">{n as string}</span>
+                <span className="flex-1 text-slate-300 leading-relaxed pt-0.5">{text as string}</span>
+                {action && (
+                  <button
+                    onClick={() => onNavigate((action as readonly [string, string])[0] as 'skills')}
+                    className="text-[11px] uppercase tracking-wider text-amber-400 hover:text-amber-300 whitespace-nowrap pt-0.5"
+                  >
+                    {(action as readonly [string, string])[1]} →
+                  </button>
+                )}
+              </li>
+            ))}
+          </ol>
+        </div>
       )}
 
       {actionsByCategory.length > 0 && (
@@ -189,6 +224,14 @@ export function PlayModeSection({ character }: { character: Character }) {
           ]}
           notes={openCard.item.notes}
           description={openCard.item.description}
+          footer={
+            <AttackRollButtons
+              name={openCard.item.name}
+              attackKind={openCard.item.attack_kind}
+              hit={openCard.item.hit_dc_value}
+              damage={openCard.item.damage}
+            />
+          }
           usesLabel={
             openCard.item.max_uses != null
               ? `${openCard.item.current_uses}/${openCard.item.max_uses} uses — recharges on ${
@@ -216,8 +259,21 @@ export function PlayModeSection({ character }: { character: Character }) {
             { label: 'Damage', value: [openCard.item.damage, openCard.item.damage_type].filter(Boolean).join(' ') },
           ]}
           description={openCard.item.description}
+          footer={
+            <button
+              className="btn-primary w-full"
+              onClick={() => {
+                setCasting(openCard.item)
+                setOpenCard(null)
+              }}
+            >
+              Cast {openCard.item.level === 0 ? 'cantrip' : 'spell'}
+            </button>
+          }
         />
       )}
+
+      {casting && <CastDialog spell={casting} character={character} onClose={() => setCasting(null)} onUpdate={onUpdate} />}
 
       {openCard?.kind === 'ability' && (
         <DetailCard

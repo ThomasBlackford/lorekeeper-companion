@@ -1,4 +1,5 @@
 import type { AbilityScoreKey, Character } from '../types'
+import { NumberField } from './NumberField'
 import { ABILITY_ORDER, ABILITY_SHORT, abilityMod, fmtMod } from '../lib/dnd'
 
 const STATS = ABILITY_ORDER.map((key) => ({ key, label: ABILITY_SHORT[key] }))
@@ -19,11 +20,12 @@ export function AbilityScores({ character, onChange }: Props) {
             className="flex flex-col items-center gap-1 bg-surface-overlay border border-border rounded-lg py-2.5"
           >
             <span className="text-[10px] uppercase tracking-widest text-slate-500 font-medium">{s.label}</span>
-            <input
-              type="number"
+            <NumberField
               className="w-12 text-center text-lg font-display font-semibold bg-transparent text-slate-100 focus:outline-none"
               value={score}
-              onChange={(e) => onChange(s.key, parseInt(e.target.value) || 0)}
+              min={1}
+              max={30}
+              onCommit={(v) => onChange(s.key, v)}
             />
             <span className="text-xs text-amber-400/80">{fmtMod(abilityMod(score))}</span>
           </div>

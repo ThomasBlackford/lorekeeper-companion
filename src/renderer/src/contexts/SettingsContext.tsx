@@ -11,7 +11,7 @@ interface Settings {
   layout: LayoutTheme
 }
 
-const DEFAULT_SETTINGS: Settings = { style: 'fantasy', color: 'amber', layout: 'single' }
+const DEFAULT_SETTINGS: Settings = { style: 'fantasy', color: 'crimson', layout: 'wide' }
 const STORAGE_KEY = 'lorekeeper-companion-settings'
 
 interface SettingsContextValue extends Settings {
@@ -22,11 +22,21 @@ interface SettingsContextValue extends Settings {
 
 const SettingsContext = createContext<SettingsContextValue | null>(null)
 
+// The dark-red redesign replaced the old amber default. Anyone with a saved
+// pre-redesign choice gets the new look once; they can pick another color after.
+const THEME_VERSION = '2'
+const THEME_VERSION_KEY = STORAGE_KEY + '-theme-version'
+
 function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return DEFAULT_SETTINGS
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) }
+    const saved = { ...DEFAULT_SETTINGS, ...JSON.parse(raw) }
+    if (localStorage.getItem(THEME_VERSION_KEY) !== THEME_VERSION) {
+      saved.color = DEFAULT_SETTINGS.color
+      saved.layout = DEFAULT_SETTINGS.layout // the two-column sheet keeps the tabs on screen without scrolling past the vitals
+    }
+    return saved
   } catch {
     return DEFAULT_SETTINGS
   }
@@ -40,6 +50,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   // which component tree is currently mounted.
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
+    localStorage.setItem(THEME_VERSION_KEY, THEME_VERSION)
     document.documentElement.setAttribute('data-style', settings.style)
     document.documentElement.setAttribute('data-color', settings.color)
   }, [settings])

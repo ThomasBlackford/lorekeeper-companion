@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Info, Pencil, Trash2 } from 'lucide-react'
 import type { CombatAction } from '../types'
 import { DetailCard } from './DetailCard'
+import { AttackRollButtons } from './AttackRollButtons'
 
 const CATEGORY_LABEL: Record<string, string> = {
   attack: 'Attack',
@@ -39,27 +40,34 @@ export function ActionRow({ action, onEdit, onDelete, onUse, onRestore }: Props)
 
   return (
     <div className="rounded-lg bg-surface-overlay/50 hover:bg-surface-overlay transition-colors text-xs row-interactive">
-      <div className="flex items-center gap-3 px-2.5 py-2">
+      <div className="flex items-center gap-x-3 gap-y-1 flex-wrap px-2.5 py-2">
         <button
           onClick={() => setShowCard(true)}
           title="Click to see the full entry"
-          className="w-32 flex-shrink-0 min-w-0 text-left flex items-center gap-1.5"
+          className="flex-1 basis-40 min-w-0 text-left flex items-center gap-1.5"
         >
           <Info size={11} className="text-slate-600 flex-shrink-0" />
           <span className="min-w-0">
             <p className="text-slate-200 font-medium truncate">{action.name}</p>
-            {action.weapon_type && <p className="text-[10px] text-slate-600 truncate">{action.weapon_type}</p>}
+            <p className="text-[10px] text-slate-600 truncate">
+              {[CATEGORY_LABEL[action.category], action.weapon_type].filter(Boolean).join(' · ')}
+            </p>
           </span>
         </button>
-        <span className="w-20 flex-shrink-0 text-slate-400 truncate">{action.range || '—'}</span>
-        <span className="w-12 flex-shrink-0 text-amber-300 font-medium">{formatHitDc(action)}</span>
-        <span className="w-28 flex-shrink-0 text-slate-300 truncate">
-          {action.damage || '—'}{action.damage_type && ` ${action.damage_type}`}
-        </span>
-        <span className="flex-1 min-w-0 text-slate-500 truncate">{action.notes}</span>
-        <span className="w-20 flex-shrink-0 text-[10px] text-slate-600 uppercase tracking-wide">
-          {CATEGORY_LABEL[action.category]}
-        </span>
+
+        <div className="flex items-center gap-x-3 flex-wrap text-slate-400">
+          {action.range && <span className="whitespace-nowrap">{action.range}</span>}
+          {action.attack_kind !== 'none' && (
+            <span className="text-amber-300 font-medium whitespace-nowrap">{formatHitDc(action)}</span>
+          )}
+          {action.damage && (
+            <span className="text-slate-200 whitespace-nowrap">
+              {action.damage}{action.damage_type && ` ${action.damage_type}`}
+            </span>
+          )}
+        </div>
+
+        <AttackRollButtons name={action.name} attackKind={action.attack_kind} hit={action.hit_dc_value} damage={action.damage} compact />
 
         {hasUses && (
           <div className="flex items-center gap-1 flex-shrink-0">
@@ -81,12 +89,16 @@ export function ActionRow({ action, onEdit, onDelete, onUse, onRestore }: Props)
           </div>
         )}
 
-        <button onClick={onEdit} title="Edit" className="text-slate-600 hover:text-slate-300 transition-colors flex-shrink-0">
-          <Pencil size={12} />
-        </button>
-        <button onClick={onDelete} title="Delete" className="text-slate-600 hover:text-red-400 transition-colors flex-shrink-0">
-          <Trash2 size={12} />
-        </button>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button onClick={onEdit} title="Edit" className="text-slate-600 hover:text-slate-300 transition-colors">
+            <Pencil size={12} />
+          </button>
+          <button onClick={onDelete} title="Delete" className="text-slate-600 hover:text-red-400 transition-colors">
+            <Trash2 size={12} />
+          </button>
+        </div>
+
+        {action.notes && <p className="basis-full text-[11px] text-slate-500 pl-[1.1rem] truncate">{action.notes}</p>}
       </div>
 
       {showCard && (
@@ -101,6 +113,7 @@ export function ActionRow({ action, onEdit, onDelete, onUse, onRestore }: Props)
           ]}
           notes={action.notes}
           description={action.description}
+          footer={<AttackRollButtons name={action.name} attackKind={action.attack_kind} hit={action.hit_dc_value} damage={action.damage} />}
           usesLabel={
             hasUses
               ? `${action.current_uses}/${action.max_uses} uses — recharges on ${

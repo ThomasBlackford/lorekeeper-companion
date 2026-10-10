@@ -1,4 +1,5 @@
 import type { Config } from 'tailwindcss'
+import colors from 'tailwindcss/colors'
 
 export default {
   content: ['./src/renderer/src/**/*.{ts,tsx}', './src/renderer/index.html'],
@@ -6,11 +7,14 @@ export default {
     extend: {
       colors: {
         surface: {
-          base: '#0d1117',
-          raised: '#161b27',
-          overlay: '#1e2436'
+          base: '#040102',
+          raised: '#0d0607',
+          overlay: '#160a0c'
         },
-        border: '#2a3050',
+        border: '#2e1519',
+        // Warm neutrals instead of Tailwind's blue-tinted slate, so body text
+        // and muted greys sit naturally on the red/black surfaces.
+        slate: colors.stone,
         accent: {
           DEFAULT: '#c9a84c',
           hover: '#e0bc5c',
@@ -41,16 +45,24 @@ export default {
       // used throughout for cards/inputs, so wiring the scale itself to a
       // variable makes the "Style" setting affect the whole app.
       borderRadius: {
-        xl: 'var(--radius-card, 0.75rem)',
-        lg: 'var(--radius-input, 0.5rem)'
+        // Sharp, squared-off UI everywhere. Only rounded-full (avatars, pips,
+        // status dots) keeps its curve, since a square dot reads as a bug.
+        none: '0',
+        sm: '0',
+        DEFAULT: '0',
+        md: '0',
+        lg: '0',
+        xl: '0',
+        '2xl': '0',
+        '3xl': '0'
       },
       // Tailwind's `transition-colors`/`transition-all`/etc. default to
       // 150ms with no `duration-*` suffix — nearly every hover/focus state
       // in the app uses one of those bare. Overriding the DEFAULT here (not
-      // adding a new scale step) makes all of them 300ms app-wide from this
+      // adding a new scale step) makes all of them 500ms app-wide from this
       // one line, instead of hunting down every occurrence individually.
       transitionDuration: {
-        DEFAULT: '300ms'
+        DEFAULT: '500ms'
       }
     }
   },

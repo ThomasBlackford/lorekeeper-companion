@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react'
 import type { Ability, AbilityCategory, Character } from '../types'
 import { AbilityRow } from './AbilityRow'
 import { AbilityForm } from './AbilityForm'
+import { useConfirm } from '../hooks/useConfirm'
 
 interface Props {
   character: Character
@@ -21,6 +22,7 @@ export function AbilitiesSection({ character, onUpdate }: Props) {
   const [filter, setFilter] = useState<AbilityCategory | 'all'>('all')
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const { ask, dialog } = useConfirm()
 
   async function handleAdd(data: Partial<Ability> & { name: string }) {
     const c = await window.api.abilities.add(data)
@@ -37,6 +39,16 @@ export function AbilitiesSection({ character, onUpdate }: Props) {
     const c = await window.api.abilities.remove(id)
     onUpdate(c)
     setEditingId(null)
+  }
+
+  function requestRemove(x: { id: string; name: string }) {
+    ask({
+      title: `Delete ${x.name}?`,
+      message: "This can't be undone.",
+      confirmLabel: 'Delete',
+      danger: true,
+      onYes: () => handleRemove(x.id)
+    })
   }
 
   function handleUse(a: Ability, sign: 1 | -1) {
@@ -90,7 +102,7 @@ export function AbilitiesSection({ character, onUpdate }: Props) {
                 initial={a}
                 onSave={(changes) => handleUpdate(a.id, changes).then(() => setEditingId(null))}
                 onCancel={() => setEditingId(null)}
-                onDelete={() => handleRemove(a.id)}
+                onDelete={() => requestRemove(a)}
               />
             ) : (
               <AbilityRow
@@ -104,6 +116,7 @@ export function AbilitiesSection({ character, onUpdate }: Props) {
           )
         )}
       </div>
+      {dialog}
     </div>
   )
 }

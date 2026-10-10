@@ -1,7 +1,9 @@
-import { ipcMain } from 'electron'
+import { app, dialog, ipcMain } from 'electron'
+import { copyFileSync, mkdirSync } from 'fs'
+import { extname, join } from 'path'
 import { getDb } from '../db'
 import { v4 as uuidv4 } from 'uuid'
-import { sendSnapshot, onConnected } from '../sync'
+import { sendSnapshot, onConnected, onDmCommand, sendCommandAck, sendToRenderer } from '../sync'
 
 const CHAR_ID = 'local'
 
@@ -37,6 +39,13 @@ interface CharacterRow {
   spellcasting_ability: string | null
   spellcasting_class: string
   gold: number
+  xp: number
+  cp: number
+  sp: number
+  ep: number
+  pp: number
+  portrait_path: string
+  dm_join_code: string
   notes: string
   background: string
   dm_server_address: string
@@ -162,6 +171,13 @@ function buildCharacter(db: ReturnType<typeof getDb>) {
     spellcasting_ability: row.spellcasting_ability,
     spellcasting_class: row.spellcasting_class,
     gold: row.gold,
+    xp: row.xp ?? 0,
+    cp: row.cp ?? 0,
+    sp: row.sp ?? 0,
+    ep: row.ep ?? 0,
+    pp: row.pp ?? 0,
+    portrait_path: row.portrait_path ?? '',
+    dm_join_code: row.dm_join_code ?? '',
     notes: row.notes,
     background: JSON.parse(row.background || '{}'),
     dm_server_address: row.dm_server_address,
@@ -204,6 +220,11 @@ function buildCharacterAndSync(db: ReturnType<typeof getDb>) {
     hp_max: character.hp_max,
     hp_temp: character.hp_temp,
     inspiration: character.inspiration,
+    death_save_successes: character.death_save_successes,
+    death_save_failures: character.death_save_failures,
+    concentration: character.concentration_spell_name,
+    exhaustion: character.exhaustion_level,
+    xp: character.xp,
     spellSlots: character.spellSlots,
     resources: character.resources,
     conditions: character.conditions
@@ -306,6 +327,87 @@ function syncSpellAction(
   syncSourceAction(db, 'spell', spellId, { name, damage, damageType, attackKind, hitDcValue })
 }
 
+// ── Shared mutations ───────────────────────────────────────────────────────
+
+function doShortRest(db: ReturnType<typeof getDb>): void {
+  db.prepare(
+    "UPDATE abilities SET current_uses = max_uses WHERE recharge = 'short_rest' AND max_uses IS NOT NULL"
+  ).run()
+  db.prepare(
+    "UPDATE actions SET current_uses = max_uses WHERE recharge = 'short_rest' AND max_uses IS NOT NULL"
+  ).run()
+}
+
+// A long rest restores everything a short rest does, plus spell slots.
+// "dawn" and "custom" recharges are intentionally left out of both — they
+// aren't tied to resting, so each ability row carries its own manual reset.
+function doLongRest(db: ReturnType<typeof getDb>): void {
+  db.prepare(
+    "UPDATE abilities SET current_uses = max_uses WHERE recharge IN ('short_rest','long_rest') AND max_uses IS NOT NULL"
+  ).run()
+  db.prepare(
+    "UPDATE actions SET current_uses = max_uses WHERE recharge IN ('short_rest','long_rest') AND max_uses IS NOT NULL"
+  ).run()
+  db.prepare('UPDATE spell_slots SET current = max').run()
+
+  // 5E: a long rest regains spent Hit Dice, up to half your total (min 1) —
+  // never the whole pool back at once. Temp HP doesn't survive a long rest
+  // either (PHB: "until they're depleted or you finish a long rest").
+  const character = db.prepare("SELECT hit_dice_total, hit_dice_current FROM character WHERE id='local'").get() as
+    | { hit_dice_total: number | null; hit_dice_current: number | null }
+    | undefined
+  if (character?.hit_dice_total != null) {
+    const total = character.hit_dice_total
+    const current = character.hit_dice_current ?? total
+    const regained = Math.max(1, Math.floor(total / 2))
+    db.prepare("UPDATE character SET hit_dice_current=? WHERE id='local'").run(Math.min(total, current + regained))
+  }
+  db.prepare("UPDATE character SET hp_temp=0 WHERE id='local'").run()
+}
+
+// Damage from the DM: temp HP absorbs first, the rest hits real HP. Mirrors
+// what the HP card does when the player types damage in themselves, plus the
+// 5E death-save rule that taking damage at 0 HP is a failed save.
+function applyHpDelta(
+  db: ReturnType<typeof getDb>,
+  amount: number
+): { summary: string; extra: Record<string, unknown> } {
+  const row = db.prepare("SELECT * FROM character WHERE id='local'").get() as CharacterRow
+  const current = row.hp_current ?? 0
+  const max = row.hp_max
+  if (amount >= 0) {
+    const next = max != null ? Math.min(max, current + amount) : current + amount
+    const revived = current <= 0 && next > 0
+    db.prepare("UPDATE character SET hp_current=?, death_save_successes=CASE WHEN ? THEN 0 ELSE death_save_successes END, death_save_failures=CASE WHEN ? THEN 0 ELSE death_save_failures END WHERE id='local'").run(
+      next, revived ? 1 : 0, revived ? 1 : 0
+    )
+    return { summary: `You were healed for ${next - current}.`, extra: { kind: 'heal', amount: next - current } }
+  }
+  const dmg = Math.abs(amount)
+  const absorbed = Math.min(row.hp_temp || 0, dmg)
+  const remaining = dmg - absorbed
+  const next = Math.max(0, current - remaining)
+  const wasUp = current > 0
+  let failures = row.death_save_failures
+  if (!wasUp && remaining > 0) failures = Math.min(3, failures + 1)
+  const droppedNow = wasUp && next === 0
+  db.prepare("UPDATE character SET hp_temp=?, hp_current=?, death_save_failures=?, death_save_successes=? WHERE id='local'").run(
+    (row.hp_temp || 0) - absorbed,
+    next,
+    droppedNow ? 0 : failures,
+    droppedNow ? 0 : row.death_save_successes
+  )
+  return {
+    summary: `You took ${dmg} damage${absorbed ? ` (${absorbed} absorbed by temp HP)` : ''}.`,
+    extra: {
+      kind: 'damage',
+      amount: dmg,
+      concentration: row.concentration_spell_name || '',
+      droppedToZero: droppedNow
+    }
+  }
+}
+
 export function registerCharacterHandlers(): void {
   // The moment the socket opens (fresh connect or the silent reconnect on
   // launch), push a snapshot so the DM sees this player immediately rather
@@ -396,6 +498,16 @@ export function registerCharacterHandlers(): void {
       spellcastingAbility, spellcastingClass, gold, notes, dmServerAddress,
       CHAR_ID
     )
+    // XP, the extra coin purses and the portrait are simple scalar fields —
+    // updated only when present so a partial save never clobbers them.
+    for (const key of ['xp', 'cp', 'sp', 'ep', 'pp'] as const) {
+      if (key in changes) {
+        db.prepare(`UPDATE character SET ${key}=? WHERE id=?`).run(Math.max(0, Math.floor(Number(changes[key]) || 0)), CHAR_ID)
+      }
+    }
+    if ('portrait_path' in changes) {
+      db.prepare('UPDATE character SET portrait_path=? WHERE id=?').run(String(changes.portrait_path ?? ''), CHAR_ID)
+    }
     return buildCharacterAndSync(db)
   })
 
@@ -819,40 +931,138 @@ export function registerCharacterHandlers(): void {
 
   ipcMain.handle('rest:short', () => {
     const db = getDb()
-    db.prepare(
-      "UPDATE abilities SET current_uses = max_uses WHERE recharge = 'short_rest' AND max_uses IS NOT NULL"
-    ).run()
-    db.prepare(
-      "UPDATE actions SET current_uses = max_uses WHERE recharge = 'short_rest' AND max_uses IS NOT NULL"
-    ).run()
+    doShortRest(db)
     return buildCharacterAndSync(db)
   })
 
   ipcMain.handle('rest:long', () => {
     const db = getDb()
-    db.prepare(
-      "UPDATE abilities SET current_uses = max_uses WHERE recharge IN ('short_rest','long_rest') AND max_uses IS NOT NULL"
-    ).run()
-    db.prepare(
-      "UPDATE actions SET current_uses = max_uses WHERE recharge IN ('short_rest','long_rest') AND max_uses IS NOT NULL"
-    ).run()
-    db.prepare('UPDATE spell_slots SET current = max').run()
-
-    // 5E: a long rest regains spent Hit Dice, up to half your total (min 1)
-    // — never the whole pool back at once. Temp HP doesn't survive a long
-    // rest either (PHB: "until they're depleted or you finish a long rest").
-    const character = db.prepare("SELECT hit_dice_total, hit_dice_current FROM character WHERE id='local'").get() as
-      | { hit_dice_total: number | null; hit_dice_current: number | null }
-      | undefined
-    if (character?.hit_dice_total != null) {
-      const total = character.hit_dice_total
-      const current = character.hit_dice_current ?? total
-      const regained = Math.max(1, Math.floor(total / 2))
-      const next = Math.min(total, current + regained)
-      db.prepare("UPDATE character SET hit_dice_current=? WHERE id='local'").run(next)
-    }
-    db.prepare("UPDATE character SET hp_temp=0 WHERE id='local'").run()
-
+    doLongRest(db)
     return buildCharacterAndSync(db)
+  })
+
+  // ── Portrait ───────────────────────────────────────────────────────────
+  ipcMain.handle('character:pickPortrait', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Choose a portrait',
+      properties: ['openFile'],
+      filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }]
+    })
+    if (result.canceled || result.filePaths.length === 0) return null
+    const dir = join(app.getPath('userData'), 'portraits')
+    mkdirSync(dir, { recursive: true })
+    const dest = join(dir, `portrait-${Date.now()}${extname(result.filePaths[0]).toLowerCase()}`)
+    copyFileSync(result.filePaths[0], dest)
+    const db = getDb()
+    db.prepare('UPDATE character SET portrait_path=? WHERE id=?').run(dest, CHAR_ID)
+    return buildCharacterAndSync(db)
+  })
+
+  ipcMain.handle('character:clearPortrait', () => {
+    const db = getDb()
+    db.prepare("UPDATE character SET portrait_path='' WHERE id=?").run(CHAR_ID)
+    return buildCharacterAndSync(db)
+  })
+
+  // ── DM commands ─────────────────────────────────────────────────────────
+  // The DM can push damage, conditions, rewards, roll requests and handouts.
+  // State changes are applied here (so they persist and survive the window
+  // being closed); the renderer is told what happened so it can show it.
+  onDmCommand((msg) => {
+    const id = typeof msg.id === 'string' ? msg.id : ''
+    const db = getDb()
+    let summary = ''
+    let changed = false
+    const extra: Record<string, unknown> = {}
+
+    try {
+      switch (msg.cmd) {
+        case 'hp_delta': {
+          const r = applyHpDelta(db, Number(msg.amount) || 0)
+          summary = r.summary
+          Object.assign(extra, r.extra)
+          changed = true
+          break
+        }
+        case 'condition': {
+          const cond = String(msg.condition ?? '')
+          const row = db.prepare("SELECT conditions FROM character WHERE id='local'").get() as { conditions: string }
+          const list = new Set<string>(JSON.parse(row.conditions || '[]'))
+          if (msg.on) list.add(cond)
+          else list.delete(cond)
+          db.prepare("UPDATE character SET conditions=? WHERE id='local'").run(JSON.stringify([...list]))
+          summary = msg.on ? `The DM applied ${cond}.` : `${cond} was removed.`
+          changed = true
+          break
+        }
+        case 'currency': {
+          const parts: string[] = []
+          for (const k of ['pp', 'gp', 'ep', 'sp', 'cp'] as const) {
+            const delta = Math.floor(Number(msg[k]) || 0)
+            if (!delta) continue
+            const col = k === 'gp' ? 'gold' : k
+            db.prepare(`UPDATE character SET ${col} = MAX(0, ${col} + ?) WHERE id='local'`).run(delta)
+            parts.push(`${delta > 0 ? '+' : ''}${delta} ${k}`)
+          }
+          summary = parts.length ? `Coins: ${parts.join(', ')}` : 'No coins changed.'
+          changed = true
+          break
+        }
+        case 'xp': {
+          const amount = Math.floor(Number(msg.amount) || 0)
+          db.prepare("UPDATE character SET xp = MAX(0, xp + ?) WHERE id='local'").run(amount)
+          summary = `${amount >= 0 ? '+' : ''}${amount} XP`
+          changed = true
+          break
+        }
+        case 'inspiration': {
+          db.prepare("UPDATE character SET inspiration=? WHERE id='local'").run(msg.on ? 1 : 0)
+          summary = msg.on ? 'The DM granted you Inspiration!' : 'Inspiration spent.'
+          changed = true
+          break
+        }
+        case 'rest': {
+          if (msg.kind === 'long') doLongRest(db)
+          else doShortRest(db)
+          summary = msg.kind === 'long' ? 'The DM called a long rest.' : 'The DM called a short rest.'
+          changed = true
+          break
+        }
+        case 'give_item': {
+          const name = String(msg.name ?? 'Item').slice(0, 120)
+          const count = (db.prepare('SELECT COUNT(*) as c FROM inventory').get() as { c: number }).c
+          const itemId = uuidv4()
+          const damage = String(msg.damage ?? '')
+          const damageType = String(msg.damage_type ?? '')
+          db.prepare(
+            `INSERT INTO inventory (id, name, category, weight, quantity, cost, notes, equipped, sort_order, damage, damage_type, range)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`
+          ).run(itemId, name, 'equipment', 0, Math.max(1, Math.floor(Number(msg.quantity) || 1)), 0, String(msg.notes ?? ''), 0, count, damage, damageType, '')
+          if (damage) syncSourceAction(db, 'item', itemId, { name, damage, damageType })
+          summary = `You received ${Number(msg.quantity) > 1 ? `${msg.quantity}× ` : ''}${name}.`
+          changed = true
+          break
+        }
+        case 'roll_request':
+        case 'turn':
+        case 'handout':
+        case 'notice': {
+          summary = typeof msg.text === 'string' ? msg.text : typeof msg.label === 'string' ? msg.label : String(msg.cmd)
+          break
+        }
+        default:
+          summary = 'Unknown command'
+      }
+      if (id) sendCommandAck(id, true, summary)
+    } catch (e) {
+      summary = e instanceof Error ? e.message : 'Command failed'
+      if (id) sendCommandAck(id, false, summary)
+      return
+    }
+
+    let character: ReturnType<typeof buildCharacter> | null = null
+    if (changed) character = buildCharacterAndSync(db)
+    sendToRenderer('dm:event', { id, cmd: msg, summary, extra })
+    if (character) sendToRenderer('character:changed', character)
   })
 }
